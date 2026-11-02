@@ -19,7 +19,6 @@ import {
   Switch,
   Text,
   TouchableOpacity,
-  useAnimatedValue,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -66,11 +65,12 @@ export function AppShell({
 }: AppShellProps) {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 960;
+  const isSmallMobile = width < 390;
   const router = useRouter();
   const pathname = usePathname();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const slideAnim = useAnimatedValue(-310);
+  const [slideAnim] = useState(() => new Animated.Value(-310));
 
   const [perfil, setPerfil] = useState<PerfilColaborador | null>(null);
   const [recentes, setRecentes] = useState<PontoRegistro[]>([]);
@@ -157,7 +157,6 @@ export function AppShell({
 
   const renderMenuContent = (inModal: boolean) => (
     <View style={[styles.sidebarInner, inModal && styles.sidebarInnerModal]}>
-      {/* Topo da barra lateral estilo Gemini */}
       <View style={styles.brandHeader}>
         <View style={styles.brandIdentity}>
           <View style={styles.brandDots}>
@@ -194,7 +193,6 @@ export function AppShell({
         )}
       </View>
 
-      {/* Navegação Principal */}
       <View style={styles.navGroup}>
         <Text style={styles.drawerSectionLabel}>NAVEGAÇÃO</Text>
         {NAV_ITEMS.map((item) => {
@@ -220,6 +218,7 @@ export function AppShell({
                   styles.navItemText,
                   isActive && styles.navItemTextActive,
                 ]}
+                numberOfLines={1}
               >
                 {item.label}
               </Text>
@@ -228,7 +227,6 @@ export function AppShell({
         })}
       </View>
 
-      {/* Histórico rápido no menu lateral (estilo conversas recentes do Gemini) */}
       <View style={styles.recentSection}>
         <Text style={styles.drawerSectionLabel}>REGISTROS RECENTES</Text>
         <ScrollView
@@ -260,7 +258,6 @@ export function AppShell({
         </ScrollView>
       </View>
 
-      {/* Personalização rápida */}
       <View style={styles.personalizationBox}>
         <View style={styles.prefRow}>
           <View style={styles.prefLabelGroup}>
@@ -283,7 +280,6 @@ export function AppShell({
         </View>
       </View>
 
-      {/* Rodapé com perfil do colaborador */}
       <TouchableOpacity
         style={styles.profileFooter}
         onPress={() => navegarPara('/cadastro')}
@@ -311,14 +307,11 @@ export function AppShell({
 
   return (
     <View style={styles.root}>
-      {/* Barra lateral fixa quando aberto em telas largas / Web Desktop */}
       {isDesktop && (
         <View style={styles.desktopSidebar}>{renderMenuContent(false)}</View>
       )}
 
-      {/* Área principal */}
       <View style={styles.mainColumn}>
-        {/* Topbar limpa e responsiva */}
         <View style={styles.topBar}>
           <View style={styles.topBarInner}>
             <View style={styles.topBarLeft}>
@@ -335,9 +328,11 @@ export function AppShell({
                   />
                 </TouchableOpacity>
               )}
-              <View>
-                <Text style={styles.screenTitle}>{title}</Text>
-                {subtitle ? (
+              <View style={styles.topBarTextCol}>
+                <Text style={styles.screenTitle} numberOfLines={1}>
+                  {title}
+                </Text>
+                {subtitle && !isSmallMobile ? (
                   <Text style={styles.screenSubtitle} numberOfLines={1}>
                     {subtitle}
                   </Text>
@@ -362,8 +357,8 @@ export function AppShell({
                       },
                     ]}
                   />
-                  <Text style={styles.syncText}>
-                    {onlineStatus ? 'Sincronizado' : 'Modo local'}
+                  <Text style={styles.syncText} numberOfLines={1}>
+                    {onlineStatus ? 'Sincronizado' : 'Local'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -378,11 +373,9 @@ export function AppShell({
           </View>
         </View>
 
-        {/* Conteúdo da tela */}
         <View style={styles.contentArea}>{children}</View>
       </View>
 
-      {/* Drawer lateral deslizante para Mobile (estilo Gemini Android) */}
       {!isDesktop && (
         <Modal
           visible={drawerOpen}
@@ -414,7 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.canvas,
   },
   desktopSidebar: {
-    width: 272,
+    width: 268,
     borderRightWidth: 1,
     borderRightColor: AntigravityPalette.border,
     backgroundColor: AntigravityPalette.surface,
@@ -488,6 +481,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.surfaceAlt,
   },
   navItemText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '500',
     color: AntigravityPalette.slate,
@@ -519,6 +513,7 @@ const styles = StyleSheet.create({
   },
   recentTextCol: {
     flex: 1,
+    minWidth: 0,
   },
   recentItemTitle: {
     fontSize: 13,
@@ -546,6 +541,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   prefLabelText: {
     fontSize: 13,
@@ -569,6 +565,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.obsidian,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   avatarText: {
     color: AntigravityPalette.canvas,
@@ -577,6 +574,7 @@ const styles = StyleSheet.create({
   },
   profileMeta: {
     flex: 1,
+    minWidth: 0,
   },
   profileName: {
     fontSize: 13,
@@ -589,12 +587,13 @@ const styles = StyleSheet.create({
   },
   mainColumn: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: AntigravityPalette.canvas,
   },
   topBar: {
-    paddingTop: Platform.OS === 'web' ? 16 : 48,
+    paddingTop: Platform.OS === 'web' ? 14 : 46,
     paddingBottom: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: AntigravityPalette.border,
     backgroundColor: AntigravityPalette.canvas,
@@ -606,13 +605,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
+    minWidth: 0,
+  },
+  topBarTextCol: {
+    flex: 1,
+    minWidth: 0,
   },
   menuButton: {
     width: 38,
@@ -623,9 +627,10 @@ const styles = StyleSheet.create({
     borderColor: AntigravityPalette.border,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   screenTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
     letterSpacing: -0.3,
@@ -638,14 +643,15 @@ const styles = StyleSheet.create({
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 0,
   },
   syncPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: AntigravityPalette.surface,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: Radii.pill,
     borderWidth: 1,
@@ -657,8 +663,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   syncText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     color: AntigravityPalette.slate,
   },
   topAvatarBtn: {
@@ -668,6 +674,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.obsidian,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   topAvatarText: {
     color: AntigravityPalette.canvas,
@@ -682,11 +689,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(18, 19, 23, 0.38)',
   },
   drawerSheet: {
-    width: 292,
+    width: 286,
+    maxWidth: '84%',
     height: '100%',
     backgroundColor: AntigravityPalette.surface,
     borderRightWidth: 1,

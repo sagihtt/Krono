@@ -1,6 +1,6 @@
 import { AntigravityPalette, Radii } from "@/constants/theme";
-import React, { useEffect } from "react";
-import { Animated, Pressable, StyleSheet, Text, useAnimatedValue } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text } from "react-native";
 
 export interface BotaoPressProps {
   titulo: string;
@@ -15,7 +15,7 @@ export const BotaoPress: React.FC<BotaoPressProps> = ({
   cor,
   variante = "primary",
 }) => {
-  const scaleValue = useAnimatedValue(1);
+  const [scaleValue] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     scaleValue.setValue(1);

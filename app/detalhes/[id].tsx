@@ -438,6 +438,7 @@ const styles = StyleSheet.create({
   },
   metaBox: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: AntigravityPalette.canvas,
     padding: 13,
     borderRadius: 12,
@@ -593,6 +594,7 @@ const styles = StyleSheet.create({
   },
   backRow: {
     alignItems: 'center',
+    width: '100%',
     marginTop: 6,
   },
   backPillBtn: {
@@ -602,9 +604,10 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: AntigravityPalette.obsidian,
     paddingVertical: 12,
-    paddingHorizontal: 26,
+    paddingHorizontal: 24,
     borderRadius: Radii.pill,
-    minWidth: 220,
+    width: '100%',
+    maxWidth: 320,
   },
   backPillText: {
     color: AntigravityPalette.canvas,

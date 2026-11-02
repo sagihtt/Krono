@@ -6,6 +6,15 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
+## [2.2.1] - 2026-11-02 (Fluxo Automático de Registro com Foto, Correção de Flexbox e Testes E2E)
+
+### Corrigido
+- **Fluxo completo em `Registrar ponto` (`app/(tabs)/index.tsx`)**: Ao tocar em **Registrar ponto**, o aplicativo autentica a identidade (`LocalAuthentication`), obtém as coordenadas GPS (`expo-location`), garante a abertura da câmera e captura a foto automaticamente (`takePictureAsync`), anexando-a ao comprovante e exibindo a prévia na tela.
+- **Dimensionamento e prevenção de sobreposição em telas estreitas (`AppShell.tsx`, `index.tsx`, `explore.tsx`, `cadastro.tsx`, `detalhes/[id].tsx`, `RegistroCard.tsx`)**: Aplicação de `flex: 1`, `minWidth: 0` e `flexShrink: 0` em todas as linhas com ícones, títulos e botões (`Atualizar`, `Remover foto`, `Alternar lente`, `Fotografar` e cabeçalhos), além de botões primários com `width: '100%'` e `maxWidth: 320`.
+- **Compatibilidade de animações na Web (`AppShell.tsx` e `BotaoPress.tsx`)**: Inicialização de `Animated.Value` via `useState(() => new Animated.Value(...))` para suportar `react-native-web` e o React Compiler simultaneamente.
+
+---
+
 ## [2.2.0] - 2026-11-02 (Identidade Oficial Krono, Menu Lateral Estilo Gemini e Layout Responsivo Web/Mobile)
 
 ### Adicionado

@@ -195,12 +195,14 @@ const styles = StyleSheet.create({
   },
   titleGroup: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   rightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   titulo: {
     fontSize: 15,

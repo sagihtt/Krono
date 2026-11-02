@@ -606,6 +606,7 @@ const styles = StyleSheet.create({
   },
   centeredActions: {
     alignItems: 'center',
+    width: '100%',
   },
   primaryPillBtn: {
     flexDirection: 'row',
@@ -614,9 +615,10 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: AntigravityPalette.obsidian,
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     borderRadius: Radii.pill,
-    minWidth: 220,
+    width: '100%',
+    maxWidth: 320,
   },
   primaryPillText: {
     color: AntigravityPalette.canvas,
@@ -630,11 +632,12 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: AntigravityPalette.canvas,
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    minWidth: 220,
+    width: '100%',
+    maxWidth: 320,
   },
   secondaryPillText: {
     color: AntigravityPalette.obsidian,
@@ -656,6 +659,7 @@ const styles = StyleSheet.create({
   },
   attachmentMeta: {
     flex: 1,
+    minWidth: 0,
   },
   attachmentName: {
     fontSize: 13,
@@ -675,6 +679,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radii.pill,
+    flexShrink: 0,
   },
   smallOutlineText: {
     fontSize: 12,

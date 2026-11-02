@@ -51,7 +51,7 @@ export default function HomeScreen() {
   const isWide = width >= 880;
   const router = useRouter();
 
-  // Relógio em tempo real para dar vida à tela inicial
+  // Relógio em tempo real
   const [horarioAtual, setHorarioAtual] = useState(() =>
     dayjs().format('HH:mm:ss')
   );
@@ -68,11 +68,12 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // Câmera e pré-visualização
+  // Câmera sempre pronta para capturar no ato do registro de ponto
   const [permissaoCamera, pedirPermissaoCamera] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
-  const [cameraExpandida, setCameraExpandida] = useState<boolean>(false);
+  const [cameraExpandida, setCameraExpandida] = useState<boolean>(true);
   const [fotoUri, setFotoUri] = useState<string | null>(null);
+  const [registrando, setRegistrando] = useState<boolean>(false);
   const cameraRef = useRef<CameraView>(null);
 
   // Geolocalização
@@ -81,7 +82,7 @@ export default function HomeScreen() {
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null);
   const [buscandoGps, setBuscandoGps] = useState<boolean>(false);
 
-  // Lista de registros e estado da interface
+  // Lista de registros e preferências
   const [pontos, setPontos] = useState<PontoRegistro[]>(PONTOS_INICIAIS);
   const [modoCompacto, setModoCompacto] = useState<boolean>(false);
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE_URL);
@@ -127,16 +128,23 @@ export default function HomeScreen() {
     }, [sincronizarDados])
   );
 
-  const tirarFotoComprovante = async () => {
-    if (!permissaoCamera?.granted) {
+  const tirarFotoComprovante = async (): Promise<string | null> => {
+    let cameraLiberada = Boolean(permissaoCamera?.granted);
+    if (!cameraLiberada) {
       const resp = await pedirPermissaoCamera();
-      if (!resp.granted) {
+      cameraLiberada = resp.granted;
+      if (!cameraLiberada) {
         Alert.alert(
           'Acesso à câmera',
-          'Ative a permissão da câmera nas configurações do aparelho para anexar fotos.'
+          'Ative a permissão da câmera para anexar a foto do comprovante.'
         );
-        return;
+        return null;
       }
+    }
+
+    if (!cameraExpandida) {
+      setCameraExpandida(true);
+      await new Promise((resolve) => setTimeout(resolve, 350));
     }
 
     if (cameraRef.current) {
@@ -146,14 +154,13 @@ export default function HomeScreen() {
         });
         if (foto?.uri) {
           setFotoUri(foto.uri);
+          return foto.uri;
         }
       } catch {
-        Alert.alert(
-          'Câmera indisponível',
-          'Não foi possível capturar a imagem neste momento.'
-        );
+        // Em emulador ou web sem webcam ativa, retorna null sem travar o fluxo
       }
     }
+    return null;
   };
 
   const obterGpsAtual = async (): Promise<Location.LocationObject | null> => {
@@ -183,67 +190,62 @@ export default function HomeScreen() {
     }
   };
 
+  // Fluxo completo ao tocar em Registrar ponto:
+  // 1. Autentica biometria -> 2. Obtém GPS -> 3. Libera câmera e já tira a foto -> 4. Salva registro
   const registrarPonto = async () => {
+    if (registrando) return;
+    setRegistrando(true);
+
     try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (hasHardware && isEnrolled) {
-        const authResult = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Confirme sua identidade para registrar o ponto',
-        });
-        if (!authResult.success) {
-          Alert.alert(
-            'Verificação necessária',
-            'A confirmação de identidade não foi concluída.'
-          );
-          return;
-        }
-      }
-    } catch {
-      // Ambientes web ou sem biometria seguem normalmente
-    }
-
-    const posicaoGps = localizacaoAtual ?? (await obterGpsAtual());
-    const latitude = posicaoGps ? posicaoGps.coords.latitude : -23.55052;
-    const longitude = posicaoGps ? posicaoGps.coords.longitude : -46.633308;
-
-    let uriFinalFoto = fotoUri;
-    if (
-      !uriFinalFoto &&
-      cameraExpandida &&
-      permissaoCamera?.granted &&
-      cameraRef.current
-    ) {
+      // 1. Autenticação Biométrica / Identidade
       try {
-        const foto = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-        if (foto?.uri) {
-          uriFinalFoto = foto.uri;
-          setFotoUri(foto.uri);
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (hasHardware && isEnrolled) {
+          const authResult = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Confirme sua identidade para registrar o ponto',
+          });
+          if (!authResult.success) {
+            Alert.alert(
+              'Verificação necessária',
+              'A confirmação de identidade não foi concluída.'
+            );
+            return;
+          }
         }
       } catch {
-        // Segue sem foto se o sensor não responder
+        // Segue normalmente em ambientes sem sensor biométrico
       }
-    }
 
-    const agora = dayjs();
-    const proximoNumero = pontos.length + 1;
-    const payloadNovoPonto: PontoRegistro = {
-      id: String(Date.now()),
-      titulo: `Registro #${proximoNumero} - ${categoriaSelecionada}`,
-      categoria: categoriaSelecionada,
-      dataHora: agora.format('DD/MM/YYYY HH:mm:ss'),
-      localizacao: posicaoGps
-        ? 'Localização confirmada via GPS'
-        : 'Sede Principal - Bloco A',
-      latitude,
-      longitude,
-      observacao:
-        observacaoInput.trim() || 'Registro efetuado pelo aplicativo.',
-      fotoUri: uriFinalFoto,
-      sincronizadoApi: false,
-    };
+      // 2. Geolocalização GPS
+      const posicaoGps = localizacaoAtual ?? (await obterGpsAtual());
+      const latitude = posicaoGps ? posicaoGps.coords.latitude : -23.55052;
+      const longitude = posicaoGps ? posicaoGps.coords.longitude : -46.633308;
 
-    try {
+      // 3. Captura automática da foto na câmera
+      const uriCapturadaAgora = await tirarFotoComprovante();
+      const uriFinalFoto = uriCapturadaAgora ?? fotoUri;
+
+      // 4. Montagem e gravação do registro
+      const agora = dayjs();
+      const proximoNumero = pontos.length + 1;
+      const payloadNovoPonto: PontoRegistro = {
+        id: String(Date.now()),
+        titulo: `Registro #${proximoNumero} - ${categoriaSelecionada}`,
+        categoria: categoriaSelecionada,
+        dataHora: agora.format('DD/MM/YYYY HH:mm:ss'),
+        localizacao: posicaoGps
+          ? 'Localização confirmada via GPS'
+          : 'Sede Principal - Bloco A',
+        latitude,
+        longitude,
+        observacao:
+          observacaoInput.trim() ||
+          'Registro realizado com foto e localização.',
+        fotoUri: uriFinalFoto,
+        sincronizadoApi: false,
+      };
+
       let registroSalvo = payloadNovoPonto;
       try {
         const criadoNaApi = await criarPontoApi(payloadNovoPonto, apiUrl);
@@ -260,10 +262,12 @@ export default function HomeScreen() {
 
       Alert.alert(
         'Ponto registrado',
-        `${categoriaSelecionada} registrada às ${agora.format('HH:mm')}.`
+        `${categoriaSelecionada} confirmada às ${agora.format('HH:mm')}.`
       );
     } catch {
       Alert.alert('Erro', 'Não foi possível concluir o registro.');
+    } finally {
+      setRegistrando(false);
     }
   };
 
@@ -304,7 +308,9 @@ export default function HomeScreen() {
             />
             <Text style={styles.dateBadgeText}>{dataAtual}</Text>
           </View>
-          <Text style={styles.shiftHint}>Expediente regular</Text>
+          <Text style={styles.shiftHint} numberOfLines={1}>
+            Expediente regular
+          </Text>
         </View>
 
         <Text style={styles.clockDigits}>{horarioAtual}</Text>
@@ -348,16 +354,26 @@ export default function HomeScreen() {
 
         <View style={styles.centeredBtnWrap}>
           <TouchableOpacity
-            style={styles.primaryActionBtn}
+            style={[
+              styles.primaryActionBtn,
+              registrando && styles.primaryActionBtnDisabled,
+            ]}
             onPress={registrarPonto}
+            disabled={registrando}
             activeOpacity={0.85}
           >
-            <Feather
-              name="check-circle"
-              size={17}
-              color={AntigravityPalette.canvas}
-            />
-            <Text style={styles.primaryActionBtnText}>Registrar ponto</Text>
+            {registrando ? (
+              <ActivityIndicator size="small" color={AntigravityPalette.canvas} />
+            ) : (
+              <Feather
+                name="check-circle"
+                size={17}
+                color={AntigravityPalette.canvas}
+              />
+            )}
+            <Text style={styles.primaryActionBtnText}>
+              {registrando ? 'Autenticando e fotografando...' : 'Registrar ponto'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -373,9 +389,11 @@ export default function HomeScreen() {
                 color={AntigravityPalette.cobaltBlue}
               />
             </View>
-            <View>
-              <Text style={styles.cardTitle}>Localização e foto</Text>
-              <Text style={styles.cardSubtitle}>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                Localização e foto
+              </Text>
+              <Text style={styles.cardSubtitle} numberOfLines={1}>
                 Dados anexados ao comprovante
               </Text>
             </View>
@@ -392,7 +410,7 @@ export default function HomeScreen() {
               color={AntigravityPalette.obsidian}
             />
             <Text style={styles.ghostPillText}>
-              {buscandoGps ? 'Localizando...' : 'Atualizar'}
+              {buscandoGps ? 'Buscando...' : 'Atualizar'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -407,7 +425,7 @@ export default function HomeScreen() {
         <View style={styles.coordsGrid}>
           <View style={styles.coordBox}>
             <Text style={styles.coordLabel}>Latitude</Text>
-            <Text style={styles.coordValue}>
+            <Text style={styles.coordValue} numberOfLines={1}>
               {localizacaoAtual
                 ? localizacaoAtual.coords.latitude.toFixed(5)
                 : '-23.55052'}
@@ -415,7 +433,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.coordBox}>
             <Text style={styles.coordLabel}>Longitude</Text>
-            <Text style={styles.coordValue}>
+            <Text style={styles.coordValue} numberOfLines={1}>
               {localizacaoAtual
                 ? localizacaoAtual.coords.longitude.toFixed(5)
                 : '-46.63331'}
@@ -427,7 +445,9 @@ export default function HomeScreen() {
 
         {/* Controle da câmera */}
         <View style={styles.cameraHeaderRow}>
-          <Text style={styles.subSectionLabel}>Registro fotográfico</Text>
+          <Text style={styles.subSectionLabel} numberOfLines={1}>
+            Câmera de comprovação
+          </Text>
           <TouchableOpacity
             style={styles.ghostPillBtn}
             onPress={() => setCameraExpandida((prev) => !prev)}
@@ -438,7 +458,7 @@ export default function HomeScreen() {
               color={AntigravityPalette.obsidian}
             />
             <Text style={styles.ghostPillText}>
-              {cameraExpandida ? 'Ocultar câmera' : 'Abrir câmera'}
+              {cameraExpandida ? 'Recolher' : 'Expandir'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -455,10 +475,10 @@ export default function HomeScreen() {
             ) : !permissaoCamera.granted ? (
               <View style={styles.permissionDeniedBox}>
                 <Text style={styles.permissionDeniedTitle}>
-                  Permissão da câmera desativada
+                  Permissão da câmera necessária
                 </Text>
                 <Text style={styles.permissionText}>
-                  Autorize o uso da câmera para anexar uma foto ao seu comprovante de ponto.
+                  Autorize o uso da câmera para fotografar automaticamente no momento do registro.
                 </Text>
                 <View style={styles.centeredBtnWrap}>
                   <BotaoPress
@@ -479,7 +499,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.cameraControlsRow}>
                   <TouchableOpacity
-                    style={styles.secondaryActionBtn}
+                    style={styles.cameraHalfBtnSecondary}
                     onPress={() =>
                       setCameraFacing((atual) =>
                         atual === 'front' ? 'back' : 'front'
@@ -491,13 +511,16 @@ export default function HomeScreen() {
                       size={14}
                       color={AntigravityPalette.obsidian}
                     />
-                    <Text style={styles.secondaryActionBtnText}>
+                    <Text
+                      style={styles.cameraHalfBtnSecondaryText}
+                      numberOfLines={1}
+                    >
                       Alternar lente
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.shutterBtn}
+                    style={styles.cameraHalfBtnPrimary}
                     onPress={tirarFotoComprovante}
                   >
                     <Feather
@@ -505,7 +528,12 @@ export default function HomeScreen() {
                       size={14}
                       color={AntigravityPalette.canvas}
                     />
-                    <Text style={styles.shutterBtnText}>Fotografar</Text>
+                    <Text
+                      style={styles.cameraHalfBtnPrimaryText}
+                      numberOfLines={1}
+                    >
+                      Fotografar
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -515,21 +543,23 @@ export default function HomeScreen() {
 
         {fotoUri && (
           <View style={styles.previewBox}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewLabel}>Foto anexada ao próximo ponto</Text>
+            <Text style={styles.previewLabel}>
+              Foto capturada para o comprovante
+            </Text>
+            <Image source={{ uri: fotoUri }} style={styles.previewImage} />
+            <View style={styles.previewFooter}>
               <TouchableOpacity
                 style={styles.removePhotoBtn}
                 onPress={() => setFotoUri(null)}
               >
                 <Feather
                   name="trash-2"
-                  size={12}
+                  size={13}
                   color={AntigravityPalette.coralRed}
                 />
                 <Text style={styles.removePhotoText}>Remover foto</Text>
               </TouchableOpacity>
             </View>
-            <Image source={{ uri: fotoUri }} style={styles.previewImage} />
           </View>
         )}
       </View>
@@ -539,9 +569,11 @@ export default function HomeScreen() {
   const renderCabecalhoHistorico = () => (
     <View style={styles.historyHeaderCard}>
       <View style={styles.historyTopRow}>
-        <View>
-          <Text style={styles.cardTitle}>Histórico de marcações</Text>
-          <Text style={styles.cardSubtitle}>
+        <View style={styles.historyTitleCol}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            Histórico de marcações
+          </Text>
+          <Text style={styles.cardSubtitle} numberOfLines={1}>
             {pontos.length} registros disponíveis
           </Text>
         </View>
@@ -560,7 +592,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Atalhos rápidos (preservando Link e useRouter exigidos pela arquitetura) */}
       <View style={styles.quickShortcutsRow}>
         <Link href="/detalhes/1" style={styles.shortcutLink}>
           <Text style={styles.shortcutLinkText}>Primeiro registro do dia</Text>
@@ -591,7 +622,6 @@ export default function HomeScreen() {
       onToggleCompacto={alternarModoCompacto}
     >
       {isWide ? (
-        /* Layout Responsivo de 2 Colunas para Web / Telas Grandes */
         <ScrollView contentContainerStyle={styles.wideScrollContainer}>
           <View style={styles.wideGrid}>
             <View style={styles.wideLeftCol}>{renderPainelControle()}</View>
@@ -615,7 +645,6 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
       ) : (
-        /* Layout Mobile Otimizado com FlatList */
         <FlatList
           data={pontos}
           keyExtractor={(item) => String(item.id)}
@@ -663,6 +692,7 @@ const styles = StyleSheet.create({
   },
   wideRightCol: {
     flex: 1,
+    minWidth: 0,
   },
   mobileListContainer: {
     paddingHorizontal: 16,
@@ -679,7 +709,7 @@ const styles = StyleSheet.create({
   clockCard: {
     backgroundColor: AntigravityPalette.surface,
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
@@ -688,6 +718,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+    gap: 8,
   },
   dateBadge: {
     flexDirection: 'row',
@@ -699,6 +730,7 @@ const styles = StyleSheet.create({
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
+    flexShrink: 0,
   },
   dateBadgeText: {
     fontSize: 12,
@@ -709,9 +741,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: AntigravityPalette.muted,
     fontWeight: '500',
+    flexShrink: 1,
   },
   clockDigits: {
-    fontSize: 38,
+    fontSize: 36,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
     letterSpacing: -1,
@@ -723,18 +756,18 @@ const styles = StyleSheet.create({
     color: AntigravityPalette.muted,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   chipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   categoryChip: {
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 13,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: Radii.pill,
     borderWidth: 1,
@@ -766,6 +799,7 @@ const styles = StyleSheet.create({
   },
   centeredBtnWrap: {
     alignItems: 'center',
+    width: '100%',
   },
   primaryActionBtn: {
     flexDirection: 'row',
@@ -774,9 +808,13 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: AntigravityPalette.obsidian,
     paddingVertical: 13,
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     borderRadius: Radii.pill,
-    minWidth: 220,
+    width: '100%',
+    maxWidth: 320,
+  },
+  primaryActionBtnDisabled: {
+    opacity: 0.72,
   },
   primaryActionBtnText: {
     color: AntigravityPalette.canvas,
@@ -795,13 +833,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
-    gap: 8,
+    gap: 10,
   },
   headerIconTitle: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
+  },
+  headerTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   softIconCircle: {
     width: 34,
@@ -810,6 +853,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.blueTint,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   cardTitle: {
     fontSize: 15,
@@ -832,6 +876,7 @@ const styles = StyleSheet.create({
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
+    flexShrink: 0,
   },
   ghostPillText: {
     fontSize: 12,
@@ -858,6 +903,7 @@ const styles = StyleSheet.create({
   },
   coordBox: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: AntigravityPalette.canvas,
     padding: 12,
     borderRadius: 12,
@@ -884,8 +930,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 10,
   },
   subSectionLabel: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 13,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
@@ -919,7 +968,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   cameraContainer: {
-    height: 190,
+    height: 185,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: AntigravityPalette.obsidian,
@@ -931,38 +980,41 @@ const styles = StyleSheet.create({
   cameraControlsRow: {
     marginTop: 10,
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 10,
   },
-  secondaryActionBtn: {
+  cameraHalfBtnSecondary: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
-  secondaryActionBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
+  cameraHalfBtnSecondaryText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: AntigravityPalette.obsidian,
   },
-  shutterBtn: {
+  cameraHalfBtnPrimary: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: AntigravityPalette.obsidian,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: Radii.pill,
   },
-  shutterBtnText: {
-    fontSize: 13,
+  cameraHalfBtnPrimaryText: {
+    fontSize: 12,
     fontWeight: '600',
     color: AntigravityPalette.canvas,
   },
@@ -973,37 +1025,38 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
   previewLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
-  },
-  removePhotoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: AntigravityPalette.coralTint,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radii.pill,
-  },
-  removePhotoText: {
-    color: AntigravityPalette.coralRed,
-    fontSize: 11,
-    fontWeight: '600',
+    textAlign: 'center',
   },
   previewImage: {
     width: '100%',
     height: 150,
     borderRadius: 10,
     backgroundColor: AntigravityPalette.surfaceAlt,
+  },
+  previewFooter: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  removePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.coralTint,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: Radii.pill,
+  },
+  removePhotoText: {
+    color: AntigravityPalette.coralRed,
+    fontSize: 12,
+    fontWeight: '600',
   },
   historyHeaderCard: {
     backgroundColor: AntigravityPalette.surface,
@@ -1018,11 +1071,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
+  },
+  historyTitleCol: {
+    flex: 1,
+    minWidth: 0,
   },
   compactToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   compactToggleLabel: {
     fontSize: 12,
@@ -1032,6 +1091,7 @@ const styles = StyleSheet.create({
   quickShortcutsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8,
   },
   shortcutLink: {

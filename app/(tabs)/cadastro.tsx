@@ -458,6 +458,7 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.obsidian,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   avatarLargeText: {
     color: AntigravityPalette.canvas,
@@ -466,6 +467,7 @@ const styles = StyleSheet.create({
   },
   identityTextCol: {
     flex: 1,
+    minWidth: 0,
   },
   identityName: {
     fontSize: 17,
@@ -575,6 +577,7 @@ const styles = StyleSheet.create({
   },
   actionsStack: {
     alignItems: "center",
+    width: "100%",
     gap: 12,
   },
   primarySaveBtn: {
@@ -584,9 +587,10 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: AntigravityPalette.obsidian,
     paddingVertical: 13,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     borderRadius: Radii.pill,
-    minWidth: 220,
+    width: "100%",
+    maxWidth: 320,
   },
   primarySaveBtnText: {
     color: AntigravityPalette.canvas,
