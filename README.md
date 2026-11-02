@@ -1,6 +1,6 @@
-# ✦ Google Antigravity Chrono — Registro de Ponto (`v2.0.0`)
+# ✦ Google Antigravity Chrono — Registro de Ponto (`v2.1.0` • Expo SDK 58)
 
-Aplicativo móvel multiplataforma em **React Native (Expo SDK 54 + Expo Router)** acompanhado de servidor **Node.js + Express**, evoluído desde os **Laboratórios 1 a 5** até cumprir todos os requisitos teóricos e práticos das **Aulas 16 a 21** de Programação para Dispositivos Móveis.
+Aplicativo móvel multiplataforma em **React Native (Expo SDK 58 + Expo Router)** acompanhado de servidor **Node.js + Express**, evoluído desde os **Laboratórios 1 a 5** até cumprir todos os requisitos teóricos e práticos das **Aulas 16 a 21** de Programação para Dispositivos Móveis.
 
 A interface segue o sistema visual extraído do portal oficial **[https://antigravity.google/](https://antigravity.google/)**.
 

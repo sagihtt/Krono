@@ -92,8 +92,46 @@ export default function CadastroScreen() {
 
   // Carrega automaticamente dados persistidos ao abrir a tela (Aula 19)
   useEffect(() => {
-    carregarDadosPersistidos();
-  }, [carregarDadosPersistidos]);
+    let ativo = true;
+    Promise.all([
+      carregarPerfilStorage(),
+      carregarTurnoFavoritoStorage(),
+      listarChavesStorage(),
+    ])
+      .then(([perfilSalvo, turnoSalvo, keys]) => {
+        if (!ativo) return;
+        setChavesGravadas([...keys]);
+        if (turnoSalvo) {
+          setTurnoFavorito(turnoSalvo);
+        }
+        if (perfilSalvo) {
+          setNome(perfilSalvo.nome);
+          setCpf(perfilSalvo.cpf);
+          setEmail(perfilSalvo.email);
+          setTelefone(perfilSalvo.telefone);
+          setDataNascimento(perfilSalvo.dataNascimento);
+          setCargo(perfilSalvo.cargo || "Engenheiro de Software Mobile");
+          setTurnoFavorito(
+            perfilSalvo.turnoFavorito || turnoSalvo || "Diurno (08h às 17h)"
+          );
+          setAceitaTermos(perfilSalvo.aceitaTermos);
+          setUltimaAtualizacao(perfilSalvo.atualizadoEm ?? null);
+          setStatusMensagem(
+            `Bem-vindo(a) de volta, ${perfilSalvo.nome}! Turno: ${perfilSalvo.turnoFavorito}.`
+          );
+        } else {
+          setStatusMensagem(
+            "Nenhum perfil salvo no disco ainda. Preencha e clique em Salvar."
+          );
+        }
+      })
+      .catch((erro) => {
+        console.error("Erro ao carregar do AsyncStorage:", erro);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
 
   // Eventos do Lab 4
   function handleSave() {

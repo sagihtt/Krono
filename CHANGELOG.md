@@ -6,6 +6,14 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
+## [2.1.0] - 2026-11-02 (Upgrade para Expo SDK 58 — Compatibilidade com Expo Go Atualizado)
+
+### Alterado
+- **Migração de Expo SDK 54 para Expo SDK 58 (`^58.0.0`)**: Atualização completa do ecossistema (`react@19.3.0`, `react-native@0.88.1`, `expo-router@~58.0.29`, `expo-camera@~58.0.14`, `expo-location@~58.0.20`, `expo-file-system@~58.0.13`, `expo-image-picker@~58.0.10`, `expo-document-picker@~58.0.4`, `expo-sharing@~58.0.21`, `expo-media-library@~58.0.13` e `typescript@~6.0.3`) para execução direta no aplicativo **Expo Go (SDK 58)**.
+- **Adequação ao React Compiler (React 19.3)**: Uso de `useAnimatedValue(1)` em `components/BotaoPress.tsx` e ajustes de tipagem em `components/ui/icon-symbol.tsx` e `components/haptic-tab.tsx`.
+
+---
+
 ## [2.0.0] - 2026-11-02 (Aula 21: Compartilhamento, Seleção de Mídia, PDFs e Sistema de Arquivos + Documentação)
 
 ### Adicionado
