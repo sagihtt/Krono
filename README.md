@@ -1,4 +1,4 @@
-# Krono — Gestão de Jornada e Frequência (`v2.2.1` • Expo SDK 58)
+# Krono — Gestão de Jornada e Frequência (`v2.2.2` • Expo SDK 58)
 
 Aplicativo multiplataforma (Android, iOS e Web Responsiva) em **React Native (Expo SDK 58 + Expo Router)** acompanhado de servidor **Node.js + Express**, evoluído desde os **Laboratórios 1 a 5** até cumprir todos os requisitos das **Aulas 16 a 21** de Programação para Dispositivos Móveis.
 

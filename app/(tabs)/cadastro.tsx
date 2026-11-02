@@ -27,11 +27,9 @@ import {
   View,
 } from "react-native";
 
-const TURNOS_DISPONIVEIS = [
-  "Diurno (08h às 17h)",
-  "Flexível (09h às 18h)",
-  "Escala 12x36",
-  "Remoto / Híbrido",
+const TURNOS_LINHAS = [
+  ["Diurno (08h às 17h)", "Flexível (09h às 18h)"],
+  ["Escala 12x36", "Remoto / Híbrido"],
 ];
 
 export default function CadastroScreen() {
@@ -284,29 +282,34 @@ export default function CadastroScreen() {
 
                 <Text style={styles.fieldLabel}>Turno de trabalho padrão</Text>
                 <View style={styles.shiftsGrid}>
-                  {TURNOS_DISPONIVEIS.map((turno) => {
-                    const selecionado = turnoFavorito === turno;
-                    return (
-                      <TouchableOpacity
-                        key={turno}
-                        style={[
-                          styles.shiftChip,
-                          selecionado && styles.shiftChipActive,
-                        ]}
-                        onPress={() => setTurnoFavorito(turno)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.shiftChipText,
-                            selecionado && styles.shiftChipTextActive,
-                          ]}
-                        >
-                          {turno}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {TURNOS_LINHAS.map((linha, rowIdx) => (
+                    <View key={rowIdx} style={styles.shiftRow}>
+                      {linha.map((turno) => {
+                        const selecionado = turnoFavorito === turno;
+                        return (
+                          <TouchableOpacity
+                            key={turno}
+                            style={[
+                              styles.shiftChip,
+                              selecionado && styles.shiftChipActive,
+                            ]}
+                            onPress={() => setTurnoFavorito(turno)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={[
+                                styles.shiftChipText,
+                                selecionado && styles.shiftChipTextActive,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {turno}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
                 </View>
               </View>
 
@@ -509,14 +512,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   shiftsGrid: {
+    gap: 10,
+  },
+  shiftRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
   shiftChip: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
@@ -529,6 +538,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     color: AntigravityPalette.slate,
+    textAlign: "center",
   },
   shiftChipTextActive: {
     color: AntigravityPalette.canvas,

@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   ScrollView,
   Share,
   StyleSheet,
@@ -210,16 +211,25 @@ export default function DetalhesScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.metaBoxFull}>
-                      <Text style={styles.label}>Unidade / Localização</Text>
-                      <Text style={styles.valor}>{ponto.localizacao}</Text>
-                    </View>
-
-                    <View style={styles.metaBoxFull}>
-                      <Text style={styles.label}>Coordenadas geográficas</Text>
-                      <Text style={styles.valor}>
-                        Latitude {ponto.latitude} • Longitude {ponto.longitude}
-                      </Text>
+                    <View style={styles.metaBoxAddress}>
+                      <View style={styles.addressCol}>
+                        <Text style={styles.label}>Endereço aproximado</Text>
+                        <Text style={styles.valor}>{ponto.localizacao}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.mapBadgeBtn}
+                        onPress={() => {
+                          const url = `https://www.google.com/maps/search/?api=1&query=${ponto.latitude},${ponto.longitude}`;
+                          Linking.openURL(url).catch(() => {});
+                        }}
+                      >
+                        <Feather
+                          name="navigation"
+                          size={12}
+                          color={AntigravityPalette.cobaltBlue}
+                        />
+                        <Text style={styles.mapBadgeText}>Ver no mapa</Text>
+                      </TouchableOpacity>
                     </View>
 
                     <View style={styles.metaBoxFull}>
@@ -451,6 +461,36 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
+  },
+  metaBoxAddress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: AntigravityPalette.canvas,
+    padding: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  addressCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mapBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: AntigravityPalette.blueTint,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radii.pill,
+    flexShrink: 0,
+  },
+  mapBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.cobaltBlue,
   },
   label: {
     fontSize: 11,

@@ -28,6 +28,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -76,9 +77,15 @@ export default function HomeScreen() {
   const [registrando, setRegistrando] = useState<boolean>(false);
   const cameraRef = useRef<CameraView>(null);
 
-  // Geolocalização
+  // Geolocalização e endereço aproximado (Reverse Geocoding)
   const [localizacaoAtual, setLocalizacaoAtual] =
     useState<Location.LocationObject | null>(null);
+  const [enderecoPrincipal, setEnderecoPrincipal] = useState<string>(
+    'SGAN 601, Módulo B — Sede Principal'
+  );
+  const [enderecoSecundario, setEnderecoSecundario] = useState<string>(
+    'Asa Norte • Brasília - DF'
+  );
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null);
   const [buscandoGps, setBuscandoGps] = useState<boolean>(false);
 
@@ -163,7 +170,84 @@ export default function HomeScreen() {
     return null;
   };
 
-  const obterGpsAtual = async (): Promise<Location.LocationObject | null> => {
+  const resolverEnderecoAproximado = useCallback(
+    async (
+      latitude: number,
+      longitude: number
+    ): Promise<{ linha1: string; linha2: string; completo: string }> => {
+      try {
+        const resultados = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude,
+        });
+        if (resultados && resultados.length > 0) {
+          const item = resultados[0];
+          const rua = [item.street, item.streetNumber]
+            .filter(Boolean)
+            .join(', ');
+          const linha1 =
+            rua || item.name || item.district || 'Endereço localizado';
+          const regiao = [
+            item.district || item.subregion,
+            item.city,
+            item.region,
+          ]
+            .filter(Boolean)
+            .join(' • ');
+          const linha2 = regiao || 'Localização confirmada pelo aparelho';
+          return {
+            linha1,
+            linha2,
+            completo: regiao ? `${linha1} — ${regiao}` : linha1,
+          };
+        }
+      } catch {
+        // Fallback para OpenStreetMap Nominatim (útil em navegadores Web)
+      }
+
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=pt-BR`
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          const addr = data?.address || {};
+          const rua = [addr.road || addr.pedestrian, addr.house_number]
+            .filter(Boolean)
+            .join(', ');
+          const linha1 =
+            rua || data?.name || addr.suburb || 'Endereço aproximado obtido';
+          const regiao = [
+            addr.suburb || addr.neighbourhood,
+            addr.city || addr.town || addr.municipality,
+            addr.state,
+          ]
+            .filter(Boolean)
+            .join(' • ');
+          const linha2 = regiao || 'Localização verificada';
+          return {
+            linha1,
+            linha2,
+            completo: regiao ? `${linha1} — ${regiao}` : linha1,
+          };
+        }
+      } catch {
+        // Segue com endereço padrão da unidade
+      }
+
+      return {
+        linha1: 'Unidade Corporativa — Presencial',
+        linha2: 'Localização confirmada no dispositivo',
+        completo: 'Unidade Corporativa — Presencial',
+      };
+    },
+    []
+  );
+
+  const obterGpsAtual = useCallback(async (): Promise<{
+    posicao: Location.LocationObject | null;
+    enderecoCompleto: string;
+  }> => {
     setBuscandoGps(true);
     setErroLocalizacao(null);
     try {
@@ -172,22 +256,54 @@ export default function HomeScreen() {
         setErroLocalizacao(
           'Permissão de localização não concedida. Utilizando endereço padrão da unidade.'
         );
-        return null;
+        return {
+          posicao: null,
+          enderecoCompleto: `${enderecoPrincipal} — ${enderecoSecundario}`,
+        };
       }
 
       const posicao = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
       setLocalizacaoAtual(posicao);
-      return posicao;
+
+      const end = await resolverEnderecoAproximado(
+        posicao.coords.latitude,
+        posicao.coords.longitude
+      );
+      setEnderecoPrincipal(end.linha1);
+      setEnderecoSecundario(end.linha2);
+
+      return { posicao, enderecoCompleto: end.completo };
     } catch {
       setErroLocalizacao(
         'Sinal de localização indisponível. Utilizando endereço padrão da unidade.'
       );
-      return null;
+      return {
+        posicao: null,
+        enderecoCompleto: `${enderecoPrincipal} — ${enderecoSecundario}`,
+      };
     } finally {
       setBuscandoGps(false);
     }
+  }, [enderecoPrincipal, enderecoSecundario, resolverEnderecoAproximado]);
+
+  // Busca silenciosamente o endereço aproximado ao abrir se a permissão já estiver concedida
+  useEffect(() => {
+    Location.getForegroundPermissionsAsync()
+      .then((perm) => {
+        if (perm.granted) {
+          obterGpsAtual();
+        }
+      })
+      .catch(() => {});
+  }, [obterGpsAtual]);
+
+  const abrirNoMapa = () => {
+    const lat = localizacaoAtual ? localizacaoAtual.coords.latitude : -15.7588;
+    const lon = localizacaoAtual ? localizacaoAtual.coords.longitude : -47.8832;
+    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    Linking.openURL(url).catch(() => {});
   };
 
   // Fluxo completo ao tocar em Registrar ponto:
@@ -217,10 +333,14 @@ export default function HomeScreen() {
         // Segue normalmente em ambientes sem sensor biométrico
       }
 
-      // 2. Geolocalização GPS
-      const posicaoGps = localizacaoAtual ?? (await obterGpsAtual());
-      const latitude = posicaoGps ? posicaoGps.coords.latitude : -23.55052;
-      const longitude = posicaoGps ? posicaoGps.coords.longitude : -46.633308;
+      // 2. Geolocalização e Endereço Aproximado
+      const resultadoGps = await obterGpsAtual();
+      const posicaoGps = resultadoGps.posicao ?? localizacaoAtual;
+      const latitude = posicaoGps ? posicaoGps.coords.latitude : -15.7588;
+      const longitude = posicaoGps ? posicaoGps.coords.longitude : -47.8832;
+      const enderecoFormatado =
+        resultadoGps.enderecoCompleto ||
+        `${enderecoPrincipal} — ${enderecoSecundario}`;
 
       // 3. Captura automática da foto na câmera
       const uriCapturadaAgora = await tirarFotoComprovante();
@@ -234,14 +354,12 @@ export default function HomeScreen() {
         titulo: `Registro #${proximoNumero} - ${categoriaSelecionada}`,
         categoria: categoriaSelecionada,
         dataHora: agora.format('DD/MM/YYYY HH:mm:ss'),
-        localizacao: posicaoGps
-          ? 'Localização confirmada via GPS'
-          : 'Sede Principal - Bloco A',
+        localizacao: enderecoFormatado,
         latitude,
         longitude,
         observacao:
           observacaoInput.trim() ||
-          'Registro realizado com foto e localização.',
+          'Registro realizado com foto e endereço aproximado.',
         fotoUri: uriFinalFoto,
         sincronizadoApi: false,
       };
@@ -422,23 +540,29 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <View style={styles.coordsGrid}>
-          <View style={styles.coordBox}>
-            <Text style={styles.coordLabel}>Latitude</Text>
-            <Text style={styles.coordValue} numberOfLines={1}>
-              {localizacaoAtual
-                ? localizacaoAtual.coords.latitude.toFixed(5)
-                : '-23.55052'}
+        <View style={styles.addressBox}>
+          <View style={styles.addressTextCol}>
+            <Text style={styles.addressLabel}>Endereço aproximado</Text>
+            <Text style={styles.addressPrimary} numberOfLines={2}>
+              {enderecoPrincipal}
+            </Text>
+            <Text style={styles.addressSecondary} numberOfLines={1}>
+              {enderecoSecundario}
             </Text>
           </View>
-          <View style={styles.coordBox}>
-            <Text style={styles.coordLabel}>Longitude</Text>
-            <Text style={styles.coordValue} numberOfLines={1}>
-              {localizacaoAtual
-                ? localizacaoAtual.coords.longitude.toFixed(5)
-                : '-46.63331'}
-            </Text>
-          </View>
+
+          <TouchableOpacity
+            style={styles.mapLinkPill}
+            onPress={abrirNoMapa}
+            activeOpacity={0.75}
+          >
+            <Feather
+              name="navigation"
+              size={12}
+              color={AntigravityPalette.cobaltBlue}
+            />
+            <Text style={styles.mapLinkText}>Mapa</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.divider} />
@@ -897,29 +1021,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#92400E',
   },
-  coordsGrid: {
+  addressBox: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  coordBox: {
-    flex: 1,
-    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
     backgroundColor: AntigravityPalette.canvas,
-    padding: 12,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
-  coordLabel: {
+  addressTextCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  addressLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
     color: AntigravityPalette.muted,
   },
-  coordValue: {
-    marginTop: 3,
+  addressPrimary: {
     fontSize: 14,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
+    lineHeight: 19,
+  },
+  addressSecondary: {
+    fontSize: 12,
+    color: AntigravityPalette.slate,
+  },
+  mapLinkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: AntigravityPalette.blueTint,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radii.pill,
+    flexShrink: 0,
+  },
+  mapLinkText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.cobaltBlue,
   },
   divider: {
     height: 1,

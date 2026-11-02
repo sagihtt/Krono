@@ -6,6 +6,16 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
+## [2.2.2] - 2026-11-02 (Grade 2x2 de Turnos e Endereço Aproximado via Geocodificação Reversa)
+
+### Adicionado
+- **Endereço aproximado por Geocodificação Reversa (`app/(tabs)/index.tsx` e `app/detalhes/[id].tsx`)**: Substituição da exibição de números de latitude/longitude pelo nome da rua, bairro e cidade obtidos via `Location.reverseGeocodeAsync` (com fallback automático para OpenStreetMap Nominatim na Web) e botão de atalho **Mapa** para abrir o pino no Google Maps.
+
+### Alterado
+- **Grade 2x2 para Turno de Trabalho Padrão (`app/(tabs)/cadastro.tsx`)**: Organização das 4 opções de turno em 2 linhas simétricas com 2 opções por linha (`flex: 1`, `minWidth: 0`), melhorando o alinhamento no Android.
+
+---
+
 ## [2.2.1] - 2026-11-02 (Fluxo Automático de Registro com Foto, Correção de Flexbox e Testes E2E)
 
 ### Corrigido
