@@ -1,11 +1,10 @@
-import { AntigravityHeader } from '@/components/AntigravityHeader';
+import { AppShell } from '@/components/AppShell';
 import { BotaoPress } from '@/components/BotaoPress';
 import { RegistroCard } from '@/components/RegistroCard';
 import { PONTOS_INICIAIS } from '@/constants/pontosMock';
 import { AntigravityPalette, Radii } from '@/constants/theme';
 import { PontoRegistro } from '@/models/ponto';
 import {
-  ClimaApiStatus,
   consultarStatusApi,
   criarPontoApi,
   DEFAULT_API_BASE_URL,
@@ -17,26 +16,29 @@ import {
   salvarPontosStorage,
   salvarPreferenciasStorage,
 } from '@/services/storageService';
+import Feather from '@expo/vector-icons/Feather';
 import dayjs from 'dayjs';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Location from 'expo-location';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
-const CATEGORIAS_RAPIDAS = [
+const CATEGORIAS_JORNADA = [
   'Entrada Regular',
   'Intervalo',
   'Retorno',
@@ -45,59 +47,66 @@ const CATEGORIAS_RAPIDAS = [
 ];
 
 export default function HomeScreen() {
-  // ============================================================================
-  // AULA 20: PERMISSÕES E REFERÊNCIA DE CÂMERA (expo-camera)
-  // ============================================================================
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
+  const router = useRouter();
+
+  // Relógio em tempo real para dar vida à tela inicial
+  const [horarioAtual, setHorarioAtual] = useState(() =>
+    dayjs().format('HH:mm:ss')
+  );
+  const [dataAtual, setDataAtual] = useState(() =>
+    dayjs().format('DD/MM/YYYY')
+  );
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const agora = dayjs();
+      setHorarioAtual(agora.format('HH:mm:ss'));
+      setDataAtual(agora.format('DD/MM/YYYY'));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Câmera e pré-visualização
   const [permissaoCamera, pedirPermissaoCamera] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
+  const [cameraExpandida, setCameraExpandida] = useState<boolean>(false);
   const [fotoUri, setFotoUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
-  // ============================================================================
-  // AULA 20: GEOLOCALIZAÇÃO E TRATAMENTO DE ERRO (expo-location)
-  // ============================================================================
+  // Geolocalização
   const [localizacaoAtual, setLocalizacaoAtual] =
     useState<Location.LocationObject | null>(null);
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null);
   const [buscandoGps, setBuscandoGps] = useState<boolean>(false);
 
-  // ============================================================================
-  // LABS 1 A 5 + AULAS 17, 18 E 19: LISTA DE PONTOS, MODO COMPACTO E API REST
-  // ============================================================================
+  // Lista de registros e estado da interface
   const [pontos, setPontos] = useState<PontoRegistro[]>(PONTOS_INICIAIS);
   const [modoCompacto, setModoCompacto] = useState<boolean>(false);
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE_URL);
-  const [climaStatus, setClimaStatus] = useState<ClimaApiStatus | null>(null);
   const [apiOnline, setApiOnline] = useState<boolean>(false);
-  const [carregandoDados, setCarregandoDados] = useState<boolean>(false);
 
-  // Campos para novo registro (POST /pontos)
+  // Formulário de novo registro
   const [categoriaSelecionada, setCategoriaSelecionada] =
     useState<string>('Entrada Regular');
   const [observacaoInput, setObservacaoInput] = useState<string>('');
 
-  // Etapa 8, 9 e 14 (Lab 5): Navegação programática com useRouter()
-  const router = useRouter();
-
   const sincronizarDados = useCallback(async () => {
-    setCarregandoDados(true);
     try {
       const prefs = await carregarPreferenciasStorage();
       setModoCompacto(prefs.modoCompacto);
       const urlAtiva = prefs.apiUrl || DEFAULT_API_BASE_URL;
       setApiUrl(urlAtiva);
 
-      // 1. Carrega do AsyncStorage primeiro (garante funcionamento offline imediato)
       const pontosLocais = await carregarPontosStorage();
       setPontos(pontosLocais);
 
-      // 2. Tenta consultar a API Express (Aulas 17 e 18: GET /clima e GET /pontos)
       try {
-        const [clima, pontosRemotos] = await Promise.all([
+        const [, pontosRemotos] = await Promise.all([
           consultarStatusApi(urlAtiva),
           listarPontosApi(urlAtiva),
         ]);
-        setClimaStatus(clima);
         setApiOnline(true);
 
         if (Array.isArray(pontosRemotos) && pontosRemotos.length > 0) {
@@ -105,14 +114,10 @@ export default function HomeScreen() {
           await salvarPontosStorage(pontosRemotos);
         }
       } catch {
-        // Se o servidor Node/Express não estiver rodando no momento, opera em modo Offline (AsyncStorage)
         setApiOnline(false);
-        setClimaStatus(null);
       }
     } catch (erro) {
-      console.error('Erro ao sincronizar registros:', erro);
-    } finally {
-      setCarregandoDados(false);
+      console.error('Erro ao carregar registros:', erro);
     }
   }, []);
 
@@ -122,16 +127,13 @@ export default function HomeScreen() {
     }, [sincronizarDados])
   );
 
-  // ============================================================================
-  // AULA 20 (PRÁTICA): CAPTURAR FOTO E EXIBIR PRÉ-VISUALIZAÇÃO ABAIXO DA LENTE
-  // ============================================================================
   const tirarFotoComprovante = async () => {
     if (!permissaoCamera?.granted) {
       const resp = await pedirPermissaoCamera();
       if (!resp.granted) {
         Alert.alert(
-          'Permissão Negada',
-          'É necessário liberar o acesso à câmera nas configurações para fotografar o comprovante.'
+          'Acesso à câmera',
+          'Ative a permissão da câmera nas configurações do aparelho para anexar fotos.'
         );
         return;
       }
@@ -145,16 +147,15 @@ export default function HomeScreen() {
         if (foto?.uri) {
           setFotoUri(foto.uri);
         }
-      } catch (erro) {
-        console.error('Erro ao capturar foto:', erro);
-        Alert.alert('Erro na Câmera', 'Não foi possível capturar a imagem.');
+      } catch {
+        Alert.alert(
+          'Câmera indisponível',
+          'Não foi possível capturar a imagem neste momento.'
+        );
       }
     }
   };
 
-  // ============================================================================
-  // AULA 20 (PRÁTICA): OBTER COORDENADAS GPS COM TRATAMENTO DE NEGATIVA
-  // ============================================================================
   const obterGpsAtual = async (): Promise<Location.LocationObject | null> => {
     setBuscandoGps(true);
     setErroLocalizacao(null);
@@ -162,7 +163,7 @@ export default function HomeScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setErroLocalizacao(
-          'Permissão de localização negada pelo usuário. Usando coordenadas padrão da Sede.'
+          'Permissão de localização não concedida. Utilizando endereço padrão da unidade.'
         );
         return null;
       }
@@ -174,7 +175,7 @@ export default function HomeScreen() {
       return posicao;
     } catch {
       setErroLocalizacao(
-        'Não foi possível obter o sinal do GPS no momento. Verifique se a localização está ativa.'
+        'Sinal de localização indisponível. Utilizando endereço padrão da unidade.'
       );
       return null;
     } finally {
@@ -182,11 +183,7 @@ export default function HomeScreen() {
     }
   };
 
-  // ============================================================================
-  // REGISTRO DE PONTO COMPLETO (Biometria + Câmera + GPS + POST API + AsyncStorage)
-  // ============================================================================
   const registrarPonto = async () => {
-    // 1. Validação Biométrica Opcional
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -195,22 +192,28 @@ export default function HomeScreen() {
           promptMessage: 'Confirme sua identidade para registrar o ponto',
         });
         if (!authResult.success) {
-          Alert.alert('Autenticação', 'Biometria cancelada ou não reconhecida.');
+          Alert.alert(
+            'Verificação necessária',
+            'A confirmação de identidade não foi concluída.'
+          );
           return;
         }
       }
     } catch {
-      // Em web ou emulador sem hardware biométrico, segue normalmente
+      // Ambientes web ou sem biometria seguem normalmente
     }
 
-    // 2. Coordenadas GPS (Aula 20)
     const posicaoGps = localizacaoAtual ?? (await obterGpsAtual());
     const latitude = posicaoGps ? posicaoGps.coords.latitude : -23.55052;
     const longitude = posicaoGps ? posicaoGps.coords.longitude : -46.633308;
 
-    // 3. Se a câmera estiver aberta e ainda não houver fotoUri, tenta capturar uma foto
     let uriFinalFoto = fotoUri;
-    if (!uriFinalFoto && permissaoCamera?.granted && cameraRef.current) {
+    if (
+      !uriFinalFoto &&
+      cameraExpandida &&
+      permissaoCamera?.granted &&
+      cameraRef.current
+    ) {
       try {
         const foto = await cameraRef.current.takePictureAsync({ quality: 0.7 });
         if (foto?.uri) {
@@ -218,7 +221,7 @@ export default function HomeScreen() {
           setFotoUri(foto.uri);
         }
       } catch {
-        // Caso o emulador não produza frame de câmera no instante, segue sem travar
+        // Segue sem foto se o sensor não responder
       }
     }
 
@@ -230,21 +233,18 @@ export default function HomeScreen() {
       categoria: categoriaSelecionada,
       dataHora: agora.format('DD/MM/YYYY HH:mm:ss'),
       localizacao: posicaoGps
-        ? 'Geolocalização GPS Confirmada'
-        : 'Sede Principal - Bloco A (Fallback)',
+        ? 'Localização confirmada via GPS'
+        : 'Sede Principal - Bloco A',
       latitude,
       longitude,
       observacao:
-        observacaoInput.trim() ||
-        'Registro efetuado com validação de hardware (Aula 20) e persistência híbrida.',
+        observacaoInput.trim() || 'Registro efetuado pelo aplicativo.',
       fotoUri: uriFinalFoto,
       sincronizadoApi: false,
     };
 
     try {
       let registroSalvo = payloadNovoPonto;
-
-      // 4. Tenta enviar via POST /pontos para a API Node.js + Express (Aula 18)
       try {
         const criadoNaApi = await criarPontoApi(payloadNovoPonto, apiUrl);
         registroSalvo = { ...criadoNaApi, sincronizadoApi: true };
@@ -253,21 +253,17 @@ export default function HomeScreen() {
         setApiOnline(false);
       }
 
-      // 5. Persiste no AsyncStorage (Aula 19) e atualiza a FlatList
       const novaLista = [registroSalvo, ...pontos];
       setPontos(novaLista);
       await salvarPontosStorage(novaLista);
       setObservacaoInput('');
 
       Alert.alert(
-        'Ponto Registrado',
-        registroSalvo.sincronizadoApi
-          ? 'Salvo na API Express (201 Created) e no AsyncStorage!'
-          : 'Salvo localmente no AsyncStorage (Modo Offline).'
+        'Ponto registrado',
+        `${categoriaSelecionada} registrada às ${agora.format('HH:mm')}.`
       );
-    } catch (erro) {
-      console.error('Erro ao salvar registro de ponto:', erro);
-      Alert.alert('Erro', 'Não foi possível salvar o registro.');
+    } catch {
+      Alert.alert('Erro', 'Não foi possível concluir o registro.');
     }
   };
 
@@ -279,17 +275,15 @@ export default function HomeScreen() {
         ...prefsAtuais,
         modoCompacto: valor,
       });
-    } catch (erro) {
-      console.error('Erro ao persistir modo compacto:', erro);
+    } catch {
+      // Silencioso
     }
   };
 
-  // Etapa 8 (Lab 5): Navegação programática com router.push para rota fixa
   const abrirPrimeiroRegistro = useCallback(() => {
     router.push('/detalhes/1');
   }, [router]);
 
-  // Etapa 9 (Lab 5): Navegação programática com envio dinâmico do ID do item
   const handleAbrirDetalhes = useCallback(
     (id: string) => {
       router.push(`/detalhes/${id}`);
@@ -297,96 +291,184 @@ export default function HomeScreen() {
     [router]
   );
 
-  return (
-    <FlatList
-      data={pontos}
-      keyExtractor={(item) => String(item.id)}
-      contentContainerStyle={styles.listContainer}
-      ListHeaderComponent={
-        <View>
-          {/* HERO HEADER INSPIRADO NO https://antigravity.google/ */}
-          <AntigravityHeader
-            badgeText="✦ CHRONO WORKSPACE v2"
-            title="Controle de Ponto Inteligente"
-            subtitle="Integração completa de Câmera, GPS, AsyncStorage, Sistema de Arquivos e API REST Express."
-            rightContent={
+  const renderPainelControle = () => (
+    <View style={styles.controlColumn}>
+      {/* Card Principal: Relógio e Registro de Ponto */}
+      <View style={styles.clockCard}>
+        <View style={styles.clockTopRow}>
+          <View style={styles.dateBadge}>
+            <Feather
+              name="calendar"
+              size={12}
+              color={AntigravityPalette.slate}
+            />
+            <Text style={styles.dateBadgeText}>{dataAtual}</Text>
+          </View>
+          <Text style={styles.shiftHint}>Expediente regular</Text>
+        </View>
+
+        <Text style={styles.clockDigits}>{horarioAtual}</Text>
+        <Text style={styles.clockSubtitle}>
+          Selecione o tipo de marcação abaixo
+        </Text>
+
+        <View style={styles.chipsContainer}>
+          {CATEGORIAS_JORNADA.map((cat) => {
+            const ativo = categoriaSelecionada === cat;
+            return (
               <TouchableOpacity
+                key={cat}
+                onPress={() => setCategoriaSelecionada(cat)}
                 style={[
-                  styles.statusBadge,
-                  apiOnline ? styles.statusOnline : styles.statusOffline,
+                  styles.categoryChip,
+                  ativo && styles.categoryChipActive,
                 ]}
-                onPress={sincronizarDados}
+                activeOpacity={0.8}
               >
-                {carregandoDados ? (
-                  <ActivityIndicator size="small" color={AntigravityPalette.obsidian} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.statusBadgeText,
-                      {
-                        color: apiOnline
-                          ? AntigravityPalette.emerald
-                          : AntigravityPalette.slate,
-                      },
-                    ]}
-                  >
-                    {apiOnline
-                      ? `● API Express Online (${climaStatus?.temperatura ?? 26}°C)`
-                      : '○ Modo Offline (AsyncStorage)'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            }
-          />
-
-          {/* =============================================================== */}
-          {/* AULA 20: MÓDULO DE CÂMERA E CICLO DE PERMISSÕES                 */}
-          {/* =============================================================== */}
-          <View style={styles.bentoCard}>
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <Text style={styles.sectionEyebrow}>AULA 20 • EXPO-CAMERA</Text>
-                <Text style={styles.sectionTitle}>Reconhecimento Visual</Text>
-              </View>
-              {permissaoCamera?.granted && (
-                <TouchableOpacity
-                  style={styles.secondaryPillSmall}
-                  onPress={() =>
-                    setCameraFacing((atual) => (atual === 'front' ? 'back' : 'front'))
-                  }
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    ativo && styles.categoryChipTextActive,
+                  ]}
                 >
-                  <Text style={styles.secondaryPillSmallText}>
-                    Lente: {cameraFacing === 'front' ? 'Frontal' : 'Traseira'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-            {/* Validação de 3 estágios de permissão (Aula 20) */}
+        <TextInput
+          style={styles.obsInput}
+          placeholder="Adicionar observação (opcional)"
+          placeholderTextColor={AntigravityPalette.muted}
+          value={observacaoInput}
+          onChangeText={setObservacaoInput}
+        />
+
+        <View style={styles.centeredBtnWrap}>
+          <TouchableOpacity
+            style={styles.primaryActionBtn}
+            onPress={registrarPonto}
+            activeOpacity={0.85}
+          >
+            <Feather
+              name="check-circle"
+              size={17}
+              color={AntigravityPalette.canvas}
+            />
+            <Text style={styles.primaryActionBtnText}>Registrar ponto</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Card de Localização e Comprovante Fotográfico */}
+      <View style={styles.surfaceCard}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.headerIconTitle}>
+            <View style={styles.softIconCircle}>
+              <Feather
+                name="map-pin"
+                size={15}
+                color={AntigravityPalette.cobaltBlue}
+              />
+            </View>
+            <View>
+              <Text style={styles.cardTitle}>Localização e foto</Text>
+              <Text style={styles.cardSubtitle}>
+                Dados anexados ao comprovante
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.ghostPillBtn}
+            onPress={obterGpsAtual}
+            disabled={buscandoGps}
+          >
+            <Feather
+              name="refresh-cw"
+              size={12}
+              color={AntigravityPalette.obsidian}
+            />
+            <Text style={styles.ghostPillText}>
+              {buscandoGps ? 'Localizando...' : 'Atualizar'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {erroLocalizacao ? (
+          <View style={styles.noticeBanner}>
+            <Feather name="info" size={14} color="#92400E" />
+            <Text style={styles.noticeBannerText}>{erroLocalizacao}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.coordsGrid}>
+          <View style={styles.coordBox}>
+            <Text style={styles.coordLabel}>Latitude</Text>
+            <Text style={styles.coordValue}>
+              {localizacaoAtual
+                ? localizacaoAtual.coords.latitude.toFixed(5)
+                : '-23.55052'}
+            </Text>
+          </View>
+          <View style={styles.coordBox}>
+            <Text style={styles.coordLabel}>Longitude</Text>
+            <Text style={styles.coordValue}>
+              {localizacaoAtual
+                ? localizacaoAtual.coords.longitude.toFixed(5)
+                : '-46.63331'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Controle da câmera */}
+        <View style={styles.cameraHeaderRow}>
+          <Text style={styles.subSectionLabel}>Registro fotográfico</Text>
+          <TouchableOpacity
+            style={styles.ghostPillBtn}
+            onPress={() => setCameraExpandida((prev) => !prev)}
+          >
+            <Feather
+              name="camera"
+              size={12}
+              color={AntigravityPalette.obsidian}
+            />
+            <Text style={styles.ghostPillText}>
+              {cameraExpandida ? 'Ocultar câmera' : 'Abrir câmera'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {cameraExpandida && (
+          <View style={styles.cameraSection}>
             {!permissaoCamera ? (
               <View style={styles.permissionBox}>
                 <ActivityIndicator color={AntigravityPalette.electricBlue} />
                 <Text style={styles.permissionText}>
-                  Verificando permissões de hardware...
+                  Verificando acesso à câmera...
                 </Text>
               </View>
             ) : !permissaoCamera.granted ? (
-              /* Caminho Vermelho: Permissão ainda não concedida */
-              <View style={styles.permissionBoxDenied}>
-                <Text style={styles.permissionTitle}>
-                  Acesso à Câmera Necessário
+              <View style={styles.permissionDeniedBox}>
+                <Text style={styles.permissionDeniedTitle}>
+                  Permissão da câmera desativada
                 </Text>
                 <Text style={styles.permissionText}>
-                  Precisamos do seu acesso à câmera para anexar a foto de comprovação no registro de ponto.
+                  Autorize o uso da câmera para anexar uma foto ao seu comprovante de ponto.
                 </Text>
-                <BotaoPress
-                  titulo="Conceder Permissão de Câmera"
-                  variante="blue"
-                  onPress={pedirPermissaoCamera}
-                />
+                <View style={styles.centeredBtnWrap}>
+                  <BotaoPress
+                    titulo="Permitir acesso à câmera"
+                    variante="blue"
+                    onPress={pedirPermissaoCamera}
+                  />
+                </View>
               </View>
             ) : (
-              /* Caminho Verde: Permissão concedida -> Renderiza CameraView */
               <View>
                 <View style={styles.cameraContainer}>
                   <CameraView
@@ -395,256 +477,316 @@ export default function HomeScreen() {
                     facing={cameraFacing}
                   />
                 </View>
-
-                <View style={styles.cameraActionsRow}>
+                <View style={styles.cameraControlsRow}>
                   <TouchableOpacity
-                    style={styles.capturePillBtn}
+                    style={styles.secondaryActionBtn}
+                    onPress={() =>
+                      setCameraFacing((atual) =>
+                        atual === 'front' ? 'back' : 'front'
+                      )
+                    }
+                  >
+                    <Feather
+                      name="repeat"
+                      size={14}
+                      color={AntigravityPalette.obsidian}
+                    />
+                    <Text style={styles.secondaryActionBtnText}>
+                      Alternar lente
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.shutterBtn}
                     onPress={tirarFotoComprovante}
                   >
-                    <Text style={styles.capturePillText}>
-                      📷 Capturar Foto (takePictureAsync)
-                    </Text>
+                    <Feather
+                      name="camera"
+                      size={14}
+                      color={AntigravityPalette.canvas}
+                    />
+                    <Text style={styles.shutterBtnText}>Fotografar</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
-
-            {/* Missão Prática Aula 20: Exibir <Image> abaixo da lente + Botão Limpar */}
-            {fotoUri && (
-              <View style={styles.previewBox}>
-                <View style={styles.previewHeader}>
-                  <Text style={styles.previewLabel}>
-                    Pré-visualização Capturada (Cache Temporário):
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.clearPhotoPill}
-                    onPress={() => setFotoUri(null)}
-                  >
-                    <Text style={styles.clearPhotoText}>Limpar foto</Text>
-                  </TouchableOpacity>
-                </View>
-                <Image source={{ uri: fotoUri }} style={styles.previewImage} />
-                <Text style={styles.uriCaption} numberOfLines={1}>
-                  URI: {fotoUri}
-                </Text>
-              </View>
-            )}
           </View>
+        )}
 
-          {/* =============================================================== */}
-          {/* AULA 20: GEOLOCALIZAÇÃO GPS (expo-location)                     */}
-          {/* =============================================================== */}
-          <View style={styles.bentoCard}>
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <Text style={styles.sectionEyebrow}>AULA 20 • EXPO-LOCATION</Text>
-                <Text style={styles.sectionTitle}>Coordenadas de Presença</Text>
-              </View>
+        {fotoUri && (
+          <View style={styles.previewBox}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewLabel}>Foto anexada ao próximo ponto</Text>
               <TouchableOpacity
-                style={styles.secondaryPillSmall}
-                onPress={obterGpsAtual}
-                disabled={buscandoGps}
+                style={styles.removePhotoBtn}
+                onPress={() => setFotoUri(null)}
               >
-                <Text style={styles.secondaryPillSmallText}>
-                  {buscandoGps ? 'Buscando...' : '📍 Atualizar GPS'}
-                </Text>
+                <Feather
+                  name="trash-2"
+                  size={12}
+                  color={AntigravityPalette.coralRed}
+                />
+                <Text style={styles.removePhotoText}>Remover foto</Text>
               </TouchableOpacity>
             </View>
-
-            {erroLocalizacao ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>⚠️ {erroLocalizacao}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.coordsGrid}>
-              <View style={styles.coordItem}>
-                <Text style={styles.coordLabel}>LATITUDE</Text>
-                <Text style={styles.coordValue}>
-                  {localizacaoAtual
-                    ? localizacaoAtual.coords.latitude.toFixed(6)
-                    : '-23.550520 (Sede)'}
-                </Text>
-              </View>
-              <View style={styles.coordItem}>
-                <Text style={styles.coordLabel}>LONGITUDE</Text>
-                <Text style={styles.coordValue}>
-                  {localizacaoAtual
-                    ? localizacaoAtual.coords.longitude.toFixed(6)
-                    : '-46.633308 (Sede)'}
-                </Text>
-              </View>
-            </View>
+            <Image source={{ uri: fotoUri }} style={styles.previewImage} />
           </View>
+        )}
+      </View>
+    </View>
+  );
 
-          {/* =============================================================== */}
-          {/* AÇÃO PRINCIPAL: REGISTRAR PONTO (CREATE POST /pontos + Storage) */}
-          {/* =============================================================== */}
-          <View style={styles.bentoCard}>
-            <Text style={styles.sectionEyebrow}>
-              AULAS 18 & 19 • REGISTRO HÍBRIDO
-            </Text>
-            <Text style={styles.sectionTitle}>Novo Registro de Ponto</Text>
-
-            <View style={styles.chipsRow}>
-              {CATEGORIAS_RAPIDAS.map((cat) => {
-                const ativo = categoriaSelecionada === cat;
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    onPress={() => setCategoriaSelecionada(cat)}
-                    style={[
-                      styles.categoryChip,
-                      ativo && styles.categoryChipActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        ativo && styles.categoryChipTextActive,
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TextInput
-              style={styles.obsInput}
-              placeholder="Observação opcional (ex: Home office, visita técnica...)"
-              placeholderTextColor={AntigravityPalette.muted}
-              value={observacaoInput}
-              onChangeText={setObservacaoInput}
-            />
-
-            <TouchableOpacity
-              style={styles.primaryCheckinBtn}
-              onPress={registrarPonto}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.primaryCheckinBtnText}>
-                ✦ BATER PONTO AGORA
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* =============================================================== */}
-          {/* LAB 5 (ETAPAS 7, 8 E 14): LINK DECLARATIVO VS useRouter()       */}
-          {/* =============================================================== */}
-          <View style={styles.bentoCard}>
-            <Text style={styles.sectionEyebrow}>LAB 5 • EXPO ROUTER</Text>
-            <Text style={styles.sectionTitle}>
-              Navegação Declarativa vs. Programática
-            </Text>
-
-            <View style={styles.navButtonsRow}>
-              {/* Etapa 7: Link declarativo para rota fixa /detalhes/1 */}
-              <Link href="/detalhes/1" style={styles.linkDeclarativo}>
-                <Text style={styles.linkText}>
-                  Link Declarativo (/detalhes/1)
-                </Text>
-              </Link>
-
-              {/* Etapa 8: Botão programático com router.push */}
-              <TouchableOpacity
-                style={styles.programmaticNavBtn}
-                onPress={abrirPrimeiroRegistro}
-              >
-                <Text style={styles.programmaticNavBtnText}>
-                  useRouter.push (/detalhes/1)
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* =============================================================== */}
-          {/* LAB 5 (ETAPA 5): SWITCH MODO COMPACTO                           */}
-          {/* =============================================================== */}
-          <View style={styles.switchBar}>
-            <View style={styles.switchInfo}>
-              <Text style={styles.switchTitle}>
-                {modoCompacto
-                  ? 'Visualização Compacta Ativa'
-                  : 'Visualização Detalhada (Bento Cards)'}
-              </Text>
-              <Text style={styles.switchSub}>
-                {pontos.length} registros carregados • Toque em um card para editar ou excluir
-              </Text>
-            </View>
-            <Switch
-              value={modoCompacto}
-              onValueChange={alternarModoCompacto}
-              trackColor={{
-                false: AntigravityPalette.border,
-                true: AntigravityPalette.electricBlue,
-              }}
-              thumbColor={AntigravityPalette.canvas}
-            />
-          </View>
+  const renderCabecalhoHistorico = () => (
+    <View style={styles.historyHeaderCard}>
+      <View style={styles.historyTopRow}>
+        <View>
+          <Text style={styles.cardTitle}>Histórico de marcações</Text>
+          <Text style={styles.cardSubtitle}>
+            {pontos.length} registros disponíveis
+          </Text>
         </View>
-      }
-      renderItem={({ item }) => (
-        <RegistroCard
-          titulo={item.titulo}
-          categoria={item.categoria}
-          dataHora={item.dataHora}
-          localizacao={item.localizacao}
-          temFoto={Boolean(item.fotoUri)}
-          temAnexo={Boolean(item.anexoPdf)}
-          sincronizadoApi={Boolean(item.sincronizadoApi)}
-          modoCompacto={modoCompacto}
-          onPress={() => handleAbrirDetalhes(String(item.id))}
+
+        <View style={styles.compactToggleRow}>
+          <Text style={styles.compactToggleLabel}>Compacto</Text>
+          <Switch
+            value={modoCompacto}
+            onValueChange={alternarModoCompacto}
+            trackColor={{
+              false: AntigravityPalette.border,
+              true: AntigravityPalette.obsidian,
+            }}
+            thumbColor={AntigravityPalette.canvas}
+          />
+        </View>
+      </View>
+
+      {/* Atalhos rápidos (preservando Link e useRouter exigidos pela arquitetura) */}
+      <View style={styles.quickShortcutsRow}>
+        <Link href="/detalhes/1" style={styles.shortcutLink}>
+          <Text style={styles.shortcutLinkText}>Primeiro registro do dia</Text>
+        </Link>
+
+        <TouchableOpacity
+          style={styles.shortcutButton}
+          onPress={abrirPrimeiroRegistro}
+        >
+          <Text style={styles.shortcutButtonText}>Abrir comprovante</Text>
+          <Feather
+            name="arrow-up-right"
+            size={13}
+            color={AntigravityPalette.cobaltBlue}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return (
+    <AppShell
+      title="Jornada de hoje"
+      subtitle="Controle de frequência e comprovantes"
+      onlineStatus={apiOnline}
+      onRefresh={sincronizarDados}
+      modoCompacto={modoCompacto}
+      onToggleCompacto={alternarModoCompacto}
+    >
+      {isWide ? (
+        /* Layout Responsivo de 2 Colunas para Web / Telas Grandes */
+        <ScrollView contentContainerStyle={styles.wideScrollContainer}>
+          <View style={styles.wideGrid}>
+            <View style={styles.wideLeftCol}>{renderPainelControle()}</View>
+            <View style={styles.wideRightCol}>
+              {renderCabecalhoHistorico()}
+              {pontos.map((item) => (
+                <RegistroCard
+                  key={String(item.id)}
+                  titulo={item.titulo}
+                  categoria={item.categoria}
+                  dataHora={item.dataHora}
+                  localizacao={item.localizacao}
+                  temFoto={Boolean(item.fotoUri)}
+                  temAnexo={Boolean(item.anexoPdf)}
+                  sincronizadoApi={Boolean(item.sincronizadoApi)}
+                  modoCompacto={modoCompacto}
+                  onPress={() => handleAbrirDetalhes(String(item.id))}
+                />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      ) : (
+        /* Layout Mobile Otimizado com FlatList */
+        <FlatList
+          data={pontos}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.mobileListContainer}
+          ListHeaderComponent={
+            <View>
+              {renderPainelControle()}
+              {renderCabecalhoHistorico()}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <RegistroCard
+              titulo={item.titulo}
+              categoria={item.categoria}
+              dataHora={item.dataHora}
+              localizacao={item.localizacao}
+              temFoto={Boolean(item.fotoUri)}
+              temAnexo={Boolean(item.anexoPdf)}
+              sincronizadoApi={Boolean(item.sincronizadoApi)}
+              modoCompacto={modoCompacto}
+              onPress={() => handleAbrirDetalhes(String(item.id))}
+            />
+          )}
         />
       )}
-      ListFooterComponent={
-        <View style={styles.footerCard}>
-          <Text style={styles.footerTitle}>
-            Arquitetura Google Antigravity • PDM 2026
-          </Text>
-          <Text style={styles.footerItem}>
-            • Aulas 16–21: UI Modular, API Express CRUD, AsyncStorage, Câmera, GPS e Arquivos
-          </Text>
-          <Text style={styles.footerItem}>
-            • Labs 1–5: FlatList, State, Props, Rotas Dinâmicas [id].tsx, Link e useRouter
-          </Text>
-        </View>
-      }
-    />
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  listContainer: {
+  wideScrollContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  wideGrid: {
+    maxWidth: 1080,
+    width: '100%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 24,
+  },
+  wideLeftCol: {
+    width: 420,
+  },
+  wideRightCol: {
+    flex: 1,
+  },
+  mobileListContainer: {
     paddingHorizontal: 16,
-    paddingTop: 52,
-    paddingBottom: 36,
-    backgroundColor: AntigravityPalette.canvas,
+    paddingTop: 16,
+    paddingBottom: 32,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radii.pill,
+  controlColumn: {
+    gap: 14,
+    marginBottom: 14,
+  },
+  clockCard: {
+    backgroundColor: AntigravityPalette.surface,
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
-  },
-  statusOnline: {
-    backgroundColor: AntigravityPalette.emeraldTint,
-    borderColor: '#A7F3D0',
-  },
-  statusOffline: {
-    backgroundColor: AntigravityPalette.surfaceAlt,
     borderColor: AntigravityPalette.border,
   },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+  clockTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  bentoCard: {
-    backgroundColor: AntigravityPalette.surface,
-    borderRadius: Radii.bento,
-    padding: 18,
+  dateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.canvas,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  dateBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.slate,
+  },
+  shiftHint: {
+    fontSize: 12,
+    color: AntigravityPalette.muted,
+    fontWeight: '500',
+  },
+  clockDigits: {
+    fontSize: 38,
+    fontWeight: '600',
+    color: AntigravityPalette.obsidian,
+    letterSpacing: -1,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  clockSubtitle: {
+    fontSize: 13,
+    color: AntigravityPalette.muted,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  categoryChip: {
+    backgroundColor: AntigravityPalette.canvas,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  categoryChipActive: {
+    backgroundColor: AntigravityPalette.obsidian,
+    borderColor: AntigravityPalette.obsidian,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: AntigravityPalette.slate,
+  },
+  categoryChipTextActive: {
+    color: AntigravityPalette.canvas,
+    fontWeight: '600',
+  },
+  obsInput: {
+    backgroundColor: AntigravityPalette.canvas,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 13,
+    color: AntigravityPalette.obsidian,
     marginBottom: 14,
+  },
+  centeredBtnWrap: {
+    alignItems: 'center',
+  },
+  primaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: AntigravityPalette.obsidian,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    borderRadius: Radii.pill,
+    minWidth: 220,
+  },
+  primaryActionBtnText: {
+    color: AntigravityPalette.canvas,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  surfaceCard: {
+    backgroundColor: AntigravityPalette.surface,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
@@ -652,59 +794,133 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
     gap: 8,
   },
-  sectionEyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: AntigravityPalette.cobaltBlue,
-    letterSpacing: 0.8,
-    marginBottom: 2,
+  headerIconTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
   },
-  sectionTitle: {
-    fontSize: 18,
+  softIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: AntigravityPalette.blueTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    fontSize: 15,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
-  secondaryPillSmall: {
-    backgroundColor: AntigravityPalette.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radii.pill,
-  },
-  secondaryPillSmallText: {
+  cardSubtitle: {
     fontSize: 12,
+    color: AntigravityPalette.muted,
+    marginTop: 1,
+  },
+  ghostPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.canvas,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  ghostPillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: AntigravityPalette.obsidian,
+  },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: AntigravityPalette.amberTint,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  noticeBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+  },
+  coordsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  coordBox: {
+    flex: 1,
+    backgroundColor: AntigravityPalette.canvas,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  coordLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: AntigravityPalette.muted,
+  },
+  coordValue: {
+    marginTop: 3,
+    fontSize: 14,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: AntigravityPalette.border,
+    marginVertical: 14,
+  },
+  cameraHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subSectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AntigravityPalette.obsidian,
+  },
+  cameraSection: {
+    marginTop: 12,
   },
   permissionBox: {
     padding: 20,
     alignItems: 'center',
     gap: 8,
   },
-  permissionBoxDenied: {
-    backgroundColor: AntigravityPalette.coralTint,
-    borderRadius: Radii.card,
+  permissionDeniedBox: {
+    backgroundColor: AntigravityPalette.canvas,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: AntigravityPalette.border,
+    gap: 6,
   },
-  permissionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  permissionDeniedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
     color: AntigravityPalette.obsidian,
-    marginBottom: 4,
+    textAlign: 'center',
   },
   permissionText: {
     fontSize: 13,
     color: AntigravityPalette.slate,
+    textAlign: 'center',
     lineHeight: 19,
   },
   cameraContainer: {
     height: 190,
-    borderRadius: Radii.card,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: AntigravityPalette.obsidian,
   },
@@ -712,29 +928,49 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  cameraActionsRow: {
+  cameraControlsRow: {
     marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: 10,
   },
-  capturePillBtn: {
-    backgroundColor: AntigravityPalette.obsidian,
-    paddingHorizontal: 18,
+  secondaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.canvas,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: Radii.pill,
-    width: '100%',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
   },
-  capturePillText: {
-    color: AntigravityPalette.canvas,
+  secondaryActionBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: AntigravityPalette.obsidian,
+  },
+  shutterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.obsidian,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: Radii.pill,
+  },
+  shutterBtnText: {
     fontSize: 13,
     fontWeight: '600',
+    color: AntigravityPalette.canvas,
   },
   previewBox: {
-    marginTop: 14,
+    marginTop: 12,
     padding: 12,
     backgroundColor: AntigravityPalette.canvas,
-    borderRadius: Radii.card,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
@@ -749,16 +985,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
   },
-  clearPhotoPill: {
+  removePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: AntigravityPalette.coralTint,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: Radii.pill,
   },
-  clearPhotoText: {
+  removePhotoText: {
     color: AntigravityPalette.coralRed,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   previewImage: {
     width: '100%',
@@ -766,165 +1005,60 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: AntigravityPalette.surfaceAlt,
   },
-  uriCaption: {
-    marginTop: 6,
-    fontSize: 11,
-    color: AntigravityPalette.muted,
-  },
-  errorBanner: {
-    backgroundColor: AntigravityPalette.amberTint,
-    padding: 10,
-    borderRadius: Radii.input,
-    marginBottom: 10,
-  },
-  errorBannerText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontWeight: '500',
-  },
-  coordsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  coordItem: {
-    flex: 1,
-    backgroundColor: AntigravityPalette.canvas,
-    padding: 12,
-    borderRadius: Radii.input,
+  historyHeaderCard: {
+    backgroundColor: AntigravityPalette.surface,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
+    marginBottom: 12,
+    gap: 12,
   },
-  coordLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: AntigravityPalette.muted,
-    letterSpacing: 0.6,
+  historyTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  coordValue: {
-    marginTop: 4,
-    fontSize: 14,
-    fontWeight: '600',
-    color: AntigravityPalette.obsidian,
+  compactToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  chipsRow: {
+  compactToggleLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: AntigravityPalette.slate,
+  },
+  quickShortcutsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
-    marginBottom: 12,
   },
-  categoryChip: {
-    backgroundColor: AntigravityPalette.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: Radii.pill,
-  },
-  categoryChipActive: {
-    backgroundColor: AntigravityPalette.obsidian,
-  },
-  categoryChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AntigravityPalette.slate,
-  },
-  categoryChipTextActive: {
-    color: AntigravityPalette.canvas,
-  },
-  obsInput: {
+  shortcutLink: {
     backgroundColor: AntigravityPalette.canvas,
+    borderRadius: Radii.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    borderRadius: Radii.input,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 14,
-    color: AntigravityPalette.obsidian,
-    marginBottom: 12,
   },
-  primaryCheckinBtn: {
-    backgroundColor: AntigravityPalette.obsidian,
-    borderRadius: Radii.pill,
-    paddingVertical: 15,
-    alignItems: 'center',
+  shortcutLinkText: {
+    color: AntigravityPalette.slate,
+    fontWeight: '500',
+    fontSize: 12,
   },
-  primaryCheckinBtnText: {
-    color: AntigravityPalette.canvas,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  navButtonsRow: {
-    marginTop: 12,
-    gap: 8,
-  },
-  linkDeclarativo: {
-    backgroundColor: AntigravityPalette.surfaceAlt,
-    borderRadius: Radii.pill,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    textAlign: 'center',
-  },
-  linkText: {
-    color: AntigravityPalette.obsidian,
-    fontWeight: '600',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  programmaticNavBtn: {
-    backgroundColor: AntigravityPalette.blueTint,
-    borderRadius: Radii.pill,
-    paddingVertical: 11,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  programmaticNavBtnText: {
-    color: AntigravityPalette.cobaltBlue,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  switchBar: {
+  shortcutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: AntigravityPalette.surface,
-    padding: 16,
-    borderRadius: Radii.bento,
-    borderWidth: 1,
-    borderColor: AntigravityPalette.border,
-    marginBottom: 14,
-    gap: 12,
+    gap: 5,
+    backgroundColor: AntigravityPalette.blueTint,
+    borderRadius: Radii.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
   },
-  switchInfo: {
-    flex: 1,
-  },
-  switchTitle: {
-    fontSize: 14,
+  shortcutButtonText: {
+    color: AntigravityPalette.cobaltBlue,
     fontWeight: '600',
-    color: AntigravityPalette.obsidian,
-  },
-  switchSub: {
     fontSize: 12,
-    color: AntigravityPalette.muted,
-    marginTop: 2,
-  },
-  footerCard: {
-    marginTop: 12,
-    padding: 18,
-    backgroundColor: AntigravityPalette.surface,
-    borderRadius: Radii.bento,
-    borderWidth: 1,
-    borderColor: AntigravityPalette.border,
-    gap: 4,
-  },
-  footerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: AntigravityPalette.obsidian,
-    marginBottom: 4,
-  },
-  footerItem: {
-    fontSize: 12,
-    color: AntigravityPalette.slate,
-    lineHeight: 18,
   },
 });

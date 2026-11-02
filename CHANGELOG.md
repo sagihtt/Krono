@@ -1,8 +1,21 @@
 # Changelog
 
-Todas as mudanças notáveis do projeto **Google Antigravity Chrono (`registroDePonto`)** estão documentadas neste arquivo.
+Todas as mudanças notáveis do projeto **Krono (`registroDePonto`)** estão documentadas neste arquivo.
 
 O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto adota o [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
+
+---
+
+## [2.2.0] - 2026-11-02 (Identidade Oficial Krono, Menu Lateral Estilo Gemini e Layout Responsivo Web/Mobile)
+
+### Adicionado
+- **Shell Adaptativo (`components/AppShell.tsx`)**:
+  - **Mobile / Android**: Menu lateral deslizante (estilo Gemini Android) acionado pelo botão no topo, exibindo navegação principal, lista de marcações recentes para acesso rápido, alternância de densidade visual (`Lista compacta`) e resumo do perfil do colaborador.
+  - **Web / Telas Grandes (`width >= 960px`)**: Barra lateral fixa à esquerda e grade responsiva de 2 colunas (`maxWidth: 1080px`) nas telas de Jornada, Documentos e Perfil.
+- **Relógio Digital em Tempo Real (`app/(tabs)/index.tsx`)**: Exibição contínua de horário e data no card principal de marcação.
+
+### Alterado
+- **Linguagem de Produto Oficial**: Remoção de rótulos acadêmicos, termos técnicos de código e emojis da interface, substituídos por ícones vetoriais `@expo/vector-icons/Feather`, botões pílula centralizados e microcopy corporativa sob a marca autoral **Krono**.
 
 ---
 

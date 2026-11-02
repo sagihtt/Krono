@@ -1,5 +1,4 @@
-import { AntigravityHeader } from "@/components/AntigravityHeader";
-import { CadastroHeader } from "@/components/cadastro/CadastroHeader";
+import { AppShell } from "@/components/AppShell";
 import { DadosAcesso } from "@/components/cadastro/DadosAcesso";
 import { DadosPessoais } from "@/components/cadastro/DadosPessoais";
 import { FormInput } from "@/components/cadastro/FormInput";
@@ -8,28 +7,37 @@ import { PerfilColaborador } from "@/models/ponto";
 import {
   carregarPerfilStorage,
   carregarTurnoFavoritoStorage,
-  listarChavesStorage,
   removerPerfilStorage,
   removerTurnoFavoritoStorage,
   salvarPerfilStorage,
   salvarTurnoFavoritoStorage,
 } from "@/services/storageService";
+import Feather from "@expo/vector-icons/Feather";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 
+const TURNOS_DISPONIVEIS = [
+  "Diurno (08h às 17h)",
+  "Flexível (09h às 18h)",
+  "Escala 12x36",
+  "Remoto / Híbrido",
+];
+
 export default function CadastroScreen() {
-  // Estados do formulário (Labs 2 a 4 + Aula 19)
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
+
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [email, setEmail] = useState("");
@@ -40,21 +48,11 @@ export default function CadastroScreen() {
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [statusMensagem, setStatusMensagem] = useState("");
-  const [campoAtivo, setCampoAtivo] = useState(false);
   const [aceitaTermos, setAceitaTermos] = useState(false);
-  const [chavesGravadas, setChavesGravadas] = useState<string[]>([]);
-  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(
+    null
+  );
 
-  const atualizarListaChaves = useCallback(async () => {
-    try {
-      const keys = await listarChavesStorage();
-      setChavesGravadas([...keys]);
-    } catch (erro) {
-      console.error("Erro ao listar chaves:", erro);
-    }
-  }, []);
-
-  // Prática 1 e 5 (Aula 19): Recuperar Dados com getItem + JSON.parse
   const carregarDadosPersistidos = useCallback(async () => {
     try {
       const [perfilSalvo, turnoSalvo] = await Promise.all([
@@ -73,34 +71,27 @@ export default function CadastroScreen() {
         setTelefone(perfilSalvo.telefone);
         setDataNascimento(perfilSalvo.dataNascimento);
         setCargo(perfilSalvo.cargo || "Engenheiro de Software Mobile");
-        setTurnoFavorito(perfilSalvo.turnoFavorito || turnoSalvo || "Diurno (08h às 17h)");
+        setTurnoFavorito(
+          perfilSalvo.turnoFavorito || turnoSalvo || "Diurno (08h às 17h)"
+        );
         setAceitaTermos(perfilSalvo.aceitaTermos);
         setUltimaAtualizacao(perfilSalvo.atualizadoEm ?? null);
-        setStatusMensagem(
-          `Bem-vindo(a) de volta, ${perfilSalvo.nome}! Turno: ${perfilSalvo.turnoFavorito}.`
-        );
+        setStatusMensagem(`Perfil de ${perfilSalvo.nome} sincronizado.`);
       } else {
-        setStatusMensagem("Nenhum perfil salvo no disco ainda. Preencha e clique em Salvar.");
+        setStatusMensagem(
+          "Complete suas informações abaixo para personalizar seus comprovantes."
+        );
       }
-
-      await atualizarListaChaves();
-    } catch (erro) {
-      console.error("Erro ao carregar do AsyncStorage:", erro);
-      setStatusMensagem("Erro ao ler dados do AsyncStorage.");
+    } catch {
+      setStatusMensagem("Não foi possível carregar os dados salvos.");
     }
-  }, [atualizarListaChaves]);
+  }, []);
 
-  // Carrega automaticamente dados persistidos ao abrir a tela (Aula 19)
   useEffect(() => {
     let ativo = true;
-    Promise.all([
-      carregarPerfilStorage(),
-      carregarTurnoFavoritoStorage(),
-      listarChavesStorage(),
-    ])
-      .then(([perfilSalvo, turnoSalvo, keys]) => {
+    Promise.all([carregarPerfilStorage(), carregarTurnoFavoritoStorage()])
+      .then(([perfilSalvo, turnoSalvo]) => {
         if (!ativo) return;
-        setChavesGravadas([...keys]);
         if (turnoSalvo) {
           setTurnoFavorito(turnoSalvo);
         }
@@ -116,547 +107,526 @@ export default function CadastroScreen() {
           );
           setAceitaTermos(perfilSalvo.aceitaTermos);
           setUltimaAtualizacao(perfilSalvo.atualizadoEm ?? null);
-          setStatusMensagem(
-            `Bem-vindo(a) de volta, ${perfilSalvo.nome}! Turno: ${perfilSalvo.turnoFavorito}.`
-          );
+          setStatusMensagem(`Perfil de ${perfilSalvo.nome} sincronizado.`);
         } else {
           setStatusMensagem(
-            "Nenhum perfil salvo no disco ainda. Preencha e clique em Salvar."
+            "Complete suas informações abaixo para personalizar seus comprovantes."
           );
         }
       })
-      .catch((erro) => {
-        console.error("Erro ao carregar do AsyncStorage:", erro);
-      });
+      .catch(() => {});
     return () => {
       ativo = false;
     };
   }, []);
 
-  // Eventos do Lab 4
-  function handleSave() {
-    setStatusMensagem("Evento onPress acionado: validando e persistindo no AsyncStorage...");
-    handleCadastro();
-  }
-
-  function handleLongPress() {
-    setStatusMensagem("Pressable: Pressão prolongada (onLongPress) detectada!");
-    Alert.alert(
-      "Evento onLongPress",
-      "Você manteve o componente Pressable pressionado!"
-    );
-  }
-
-  function handlePress() {
-    setStatusMensagem("Pressable: Toque simples (onPress) realizado!");
-  }
-
-  function handleFocus() {
-    setCampoAtivo(true);
-  }
-
-  function handleBlur() {
-    setCampoAtivo(false);
-  }
-
-  function handleSubmit() {
-    setStatusMensagem("Teclado: onSubmitEditing acionado no campo Nome!");
-  }
-
-  // Prática 1, 4 e 5 (Aula 19): Salvar Perfil em JSON (setItem + JSON.stringify)
-  const handleCadastro = async () => {
-    if (!nome.trim() || !email.trim()) {
-      setStatusMensagem("Atenção: Preencha pelo menos Nome e E-mail para salvar.");
-      Alert.alert(
-        "Campos obrigatórios",
-        "Preencha Nome e E-mail para gravar seu perfil no dispositivo."
-      );
-      return;
-    }
-
-    if (senha && confirmarSenha && senha !== confirmarSenha) {
-      setStatusMensagem("Erro: A confirmação de senha não confere.");
-      Alert.alert(
-        "Erro de validação",
-        "A confirmação de senha deve ser igual à senha digitada."
-      );
+  async function handleSalvarCadastro() {
+    if (!nome.trim()) {
+      Alert.alert("Campo obrigatório", "Informe seu nome completo.");
       return;
     }
 
     if (!aceitaTermos) {
-      setStatusMensagem("Atenção: Ative o Switch 'Aceitar termos' para continuar.");
       Alert.alert(
-        "Termos de uso",
-        "Ative a opção 'Aceitar termos' para concluir o registro."
+        "Confirmação necessária",
+        "Confirme a veracidade dos dados cadastrais antes de salvar."
       );
       return;
     }
 
+    if (senha && senha !== confirmarSenha) {
+      Alert.alert(
+        "Senhas diferentes",
+        "A confirmação de senha não coincide com a senha digitada."
+      );
+      return;
+    }
+
+    const agora = new Date().toLocaleString("pt-BR");
+    const novoPerfil: PerfilColaborador = {
+      nome: nome.trim(),
+      cpf,
+      email: email.trim(),
+      telefone,
+      dataNascimento,
+      cargo: cargo.trim(),
+      turnoFavorito,
+      aceitaTermos,
+      atualizadoEm: agora,
+    };
+
     try {
-      const novoPerfil: PerfilColaborador = {
-        nome: nome.trim(),
-        cpf: cpf.trim(),
-        email: email.trim(),
-        telefone: telefone.trim(),
-        dataNascimento: dataNascimento.trim(),
-        cargo: cargo.trim(),
-        turnoFavorito: turnoFavorito.trim(),
-        aceitaTermos,
-      };
+      await Promise.all([
+        salvarPerfilStorage(novoPerfil),
+        salvarTurnoFavoritoStorage(turnoFavorito),
+      ]);
 
-      // Grava objeto completo com JSON.stringify e string de preferência com setItem
-      await salvarPerfilStorage(novoPerfil);
-      await salvarTurnoFavoritoStorage(novoPerfil.turnoFavorito);
-
-      // Limpa senhas da memória (Regra Aula 19: nunca persistir senhas no AsyncStorage)
       setSenha("");
       setConfirmarSenha("");
+      setUltimaAtualizacao(agora);
+      setStatusMensagem(`Alterações salvas em ${agora}.`);
 
-      const agoraStr = new Date().toLocaleString("pt-BR");
-      setUltimaAtualizacao(agoraStr);
-      await atualizarListaChaves();
-
-      setStatusMensagem(
-        `Perfil de "${novoPerfil.nome}" gravado no disco via AsyncStorage!`
-      );
       Alert.alert(
-        "Persistência Concluída (Aula 19)",
-        `Objeto JSON salvo no AsyncStorage.\n\n• Colaborador: ${novoPerfil.nome}\n• Turno: ${novoPerfil.turnoFavorito}\n• Nota: Senha validada em RAM e não salva no disco (AsyncStorage sem criptografia).`
+        "Perfil atualizado",
+        "Seus dados cadastrais e preferências de turno foram salvos."
       );
-    } catch (erro) {
-      console.error("Erro ao salvar no AsyncStorage:", erro);
-      setStatusMensagem("Falha ao gravar no AsyncStorage.");
+    } catch {
+      Alert.alert("Erro", "Não foi possível salvar as alterações.");
     }
-  };
+  }
 
-  // Prática 3 (Aula 19): Apagar dados do disco com removeItem
-  const handleRemoverDoStorage = async () => {
-    try {
-      await removerPerfilStorage();
-      await removerTurnoFavoritoStorage();
-      handleLimparMemoria();
-      setUltimaAtualizacao(null);
-      await atualizarListaChaves();
-      setStatusMensagem(
-        "Preferência e perfil removidos do disco (AsyncStorage.removeItem)!"
-      );
-    } catch (erro) {
-      console.error("Erro ao remover do AsyncStorage:", erro);
-    }
-  };
-
-  // Limpa apenas o useState (Memória de Curto Prazo)
-  const handleLimparMemoria = () => {
+  function handleDescartarSessao() {
     setNome("");
     setCpf("");
     setEmail("");
     setTelefone("");
     setDataNascimento("");
-    setCargo("");
-    setTurnoFavorito("");
     setSenha("");
     setConfirmarSenha("");
     setAceitaTermos(false);
     setStatusMensagem(
-      "Memória RAM (useState) limpa. Clique em 'Carregar do Disco' para recuperar do AsyncStorage!"
+      "Campos limpos na tela. Toque em Restaurar para recarregar os dados salvos."
     );
-  };
+  }
+
+  async function handleRedefinirCadastro() {
+    try {
+      await Promise.all([
+        removerPerfilStorage(),
+        removerTurnoFavoritoStorage(),
+      ]);
+      setNome("");
+      setCpf("");
+      setEmail("");
+      setTelefone("");
+      setDataNascimento("");
+      setSenha("");
+      setConfirmarSenha("");
+      setAceitaTermos(false);
+      setUltimaAtualizacao(null);
+      setStatusMensagem("Os dados cadastrais foram removidos deste aparelho.");
+      Alert.alert("Cadastro redefinido", "Seus dados foram apagados do dispositivo.");
+    } catch {
+      Alert.alert("Erro", "Não foi possível redefinir o cadastro.");
+    }
+  }
+
+  const iniciais = nome.trim()
+    ? nome
+        .trim()
+        .split(" ")
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase())
+        .join("")
+    : "TC";
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <AppShell
+      title="Meu perfil"
+      subtitle="Dados cadastrais, jornada e preferências"
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <AntigravityHeader
-          badgeText="✦ AULA 19 · ASYNCSTORAGE"
-          title="Identidade & Persistência Local"
-          subtitle="Memória de longo prazo no dispositivo com JSON.stringify e JSON.parse"
-        />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={[styles.container, isWide && styles.containerWide]}>
+            {/* Coluna 1: Resumo do Colaborador + Dados Pessoais */}
+            <View style={[styles.column, isWide && styles.columnHalf]}>
+              {/* Card de Identificação */}
+              <View style={styles.identityCard}>
+                <View style={styles.avatarLarge}>
+                  <Text style={styles.avatarLargeText}>{iniciais}</Text>
+                </View>
+                <View style={styles.identityTextCol}>
+                  <Text style={styles.identityName}>
+                    {nome.trim() || "Colaborador Krono"}
+                  </Text>
+                  <Text style={styles.identityRole}>
+                    {cargo.trim() || "Defina seu cargo abaixo"}
+                  </Text>
+                  {ultimaAtualizacao ? (
+                    <Text style={styles.updatedCaption}>
+                      Atualizado em {ultimaAtualizacao}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
 
-        {/* Painel de Status da Persistência (Aula 19) */}
-        <View style={styles.storageBanner}>
-          <View style={styles.storageHeaderRow}>
-            <Text style={styles.storageBannerTitle}>
-              Cofre Local (AsyncStorage)
-            </Text>
-            <View style={styles.pillCount}>
-              <Text style={styles.pillCountText}>
-                {chavesGravadas.length} chaves ativas
-              </Text>
+              {/* Card: Dados Pessoais */}
+              <View style={styles.card}>
+                <DadosPessoais
+                  nome={nome}
+                  onChangeNome={setNome}
+                  cpf={cpf}
+                  onChangeCpf={setCpf}
+                  email={email}
+                  onChangeEmail={setEmail}
+                  telefone={telefone}
+                  onChangeTelefone={setTelefone}
+                  dataNascimento={dataNascimento}
+                  onChangeDataNascimento={setDataNascimento}
+                />
+              </View>
+            </View>
+
+            {/* Coluna 2: Jornada, Credenciais e Ações */}
+            <View style={[styles.column, isWide && styles.columnHalf]}>
+              {/* Card: Cargo e Jornada */}
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>Cargo e jornada</Text>
+                <FormInput
+                  label="Cargo ou Função"
+                  placeholder="Ex: Engenheiro de Software"
+                  value={cargo}
+                  onChangeText={setCargo}
+                />
+
+                <Text style={styles.fieldLabel}>Turno de trabalho padrão</Text>
+                <View style={styles.shiftsGrid}>
+                  {TURNOS_DISPONIVEIS.map((turno) => {
+                    const selecionado = turnoFavorito === turno;
+                    return (
+                      <TouchableOpacity
+                        key={turno}
+                        style={[
+                          styles.shiftChip,
+                          selecionado && styles.shiftChipActive,
+                        ]}
+                        onPress={() => setTurnoFavorito(turno)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.shiftChipText,
+                            selecionado && styles.shiftChipTextActive,
+                          ]}
+                        >
+                          {turno}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Card: Credenciais e Confirmação */}
+              <View style={styles.card}>
+                <DadosAcesso
+                  senha={senha}
+                  onChangeSenha={setSenha}
+                  confirmarSenha={confirmarSenha}
+                  onChangeConfirmarSenha={setConfirmarSenha}
+                />
+
+                <View style={styles.privacyBanner}>
+                  <Feather
+                    name="shield"
+                    size={15}
+                    color={AntigravityPalette.cobaltBlue}
+                  />
+                  <Text style={styles.privacyBannerText}>
+                    Por segurança, sua senha é utilizada apenas para validação da sessão e não fica gravada no armazenamento local.
+                  </Text>
+                </View>
+
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextCol}>
+                    <Text style={styles.switchLabel}>
+                      Confirmo que as informações acima estão atualizadas
+                    </Text>
+                  </View>
+                  <Switch
+                    value={aceitaTermos}
+                    onValueChange={setAceitaTermos}
+                    trackColor={{
+                      false: AntigravityPalette.border,
+                      true: AntigravityPalette.obsidian,
+                    }}
+                    thumbColor={AntigravityPalette.canvas}
+                  />
+                </View>
+
+                {statusMensagem ? (
+                  <Text style={styles.statusFeedback}>{statusMensagem}</Text>
+                ) : null}
+
+                {/* Botões centralizados */}
+                <View style={styles.actionsStack}>
+                  <TouchableOpacity
+                    style={styles.primarySaveBtn}
+                    onPress={handleSalvarCadastro}
+                    activeOpacity={0.85}
+                  >
+                    <Feather
+                      name="check"
+                      size={16}
+                      color={AntigravityPalette.canvas}
+                    />
+                    <Text style={styles.primarySaveBtnText}>
+                      Salvar alterações
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.secondaryButtonsRow}>
+                    <TouchableOpacity
+                      style={styles.secondaryPillBtn}
+                      onPress={carregarDadosPersistidos}
+                    >
+                      <Feather
+                        name="refresh-cw"
+                        size={13}
+                        color={AntigravityPalette.obsidian}
+                      />
+                      <Text style={styles.secondaryPillText}>Restaurar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.secondaryPillBtn}
+                      onPress={handleDescartarSessao}
+                    >
+                      <Feather
+                        name="rotate-ccw"
+                        size={13}
+                        color={AntigravityPalette.obsidian}
+                      />
+                      <Text style={styles.secondaryPillText}>
+                        Limpar campos
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.dangerPillBtn}
+                      onPress={handleRedefinirCadastro}
+                    >
+                      <Feather
+                        name="trash-2"
+                        size={13}
+                        color={AntigravityPalette.coralRed}
+                      />
+                      <Text style={styles.dangerPillText}>Redefinir</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
             </View>
           </View>
-
-          <Text style={styles.storageBannerDesc}>
-            Turno favorito salvo:{" "}
-            <Text style={styles.boldText}>
-              {turnoFavorito || "Nenhuma preferência salva"}
-            </Text>
-          </Text>
-
-          {ultimaAtualizacao ? (
-            <Text style={styles.storageTimestamp}>
-              Última gravação em disco: {ultimaAtualizacao}
-            </Text>
-          ) : null}
-
-          <View style={styles.storageButtonsRow}>
-            <TouchableOpacity
-              style={styles.pillBtnPrimary}
-              onPress={handleSave}
-            >
-              <Text style={styles.pillBtnPrimaryText}>Salvar (setItem)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.pillBtnSecondary}
-              onPress={carregarDadosPersistidos}
-            >
-              <Text style={styles.pillBtnSecondaryText}>Carregar (getItem)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.pillBtnDanger}
-              onPress={handleRemoverDoStorage}
-            >
-              <Text style={styles.pillBtnDangerText}>Remover (removeItem)</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <CadastroHeader
-            title="Ficha do Colaborador"
-            subtitle="Altere seus dados, feche o app e reabra para testar a persistência"
-          />
-
-          <DadosPessoais
-            nome={nome}
-            onChangeNome={setNome}
-            onFocusNome={handleFocus}
-            onBlurNome={handleBlur}
-            onSubmitEditingNome={handleSubmit}
-            cpf={cpf}
-            onChangeCpf={setCpf}
-            email={email}
-            onChangeEmail={setEmail}
-            telefone={telefone}
-            onChangeTelefone={setTelefone}
-            dataNascimento={dataNascimento}
-            onChangeDataNascimento={setDataNascimento}
-          />
-
-          {/* Campos extras da Aula 19: Cargo e Turno Favorito */}
-          <FormInput
-            label="Cargo / Função"
-            placeholder="Ex: Desenvolvedor Mobile"
-            value={cargo}
-            onChangeText={setCargo}
-          />
-
-          <FormInput
-            label="Turno / Jornada Favorita (Prática 4 - Aula 19)"
-            placeholder="Ex: Diurno (08h às 17h) ou Flexível"
-            value={turnoFavorito}
-            onChangeText={setTurnoFavorito}
-          />
-
-          {campoAtivo ? (
-            <Text style={styles.focoIndicador}>
-              {"Campo 'Nome Completo' está ativo (evento onFocus)"}
-            </Text>
-          ) : null}
-
-          {nome.trim() ? (
-            <Text style={styles.previewTexto}>
-              Estado em RAM (useState): {nome} · {turnoFavorito}
-            </Text>
-          ) : null}
-
-          <DadosAcesso
-            senha={senha}
-            onChangeSenha={setSenha}
-            confirmarSenha={confirmarSenha}
-            onChangeConfirmarSenha={setConfirmarSenha}
-          />
-
-          {/* Aviso de Segurança explícito da Aula 19 (Slide 5 e 15) */}
-          <View style={styles.securityNotice}>
-            <Text style={styles.securityNoticeText}>
-              ⚠️ Regra de Segurança (Aula 19): O AsyncStorage não possui
-              criptografia por padrão. Sua senha é validada apenas em memória e
-              nunca é gravada em texto puro no disco.
-            </Text>
-          </View>
-
-          <View style={styles.switchContainer}>
-            <Switch
-              value={aceitaTermos}
-              onValueChange={setAceitaTermos}
-              trackColor={{
-                false: AntigravityPalette.border,
-                true: AntigravityPalette.obsidian,
-              }}
-              thumbColor={AntigravityPalette.canvas}
-            />
-            <Text style={styles.switchTexto}>
-              {aceitaTermos
-                ? "Termos de ponto eletrônico aceitos"
-                : "Aceitar termos de ponto eletrônico"}
-            </Text>
-          </View>
-
-          {statusMensagem ? (
-            <Text style={styles.statusMensagem}>{statusMensagem}</Text>
-          ) : null}
-
-          <View style={styles.acoesContainer}>
-            <TouchableOpacity style={styles.ctaObsidian} onPress={handleSave}>
-              <Text style={styles.ctaObsidianText}>
-                Salvar Perfil no AsyncStorage
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.ctaSlate}
-              onPress={handleLimparMemoria}
-            >
-              <Text style={styles.ctaSlateText}>
-                Limpar apenas useState (Teste de Curto Prazo)
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.pressableArea,
-              pressed && styles.pressablePressed,
-            ]}
-            onPress={handlePress}
-            onLongPress={handleLongPress}
-          >
-            <Text style={styles.pressableText}>
-              Toque simples (onPress) ou segure (onLongPress)
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
   container: {
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
+    gap: 16,
+  },
+  containerWide: {
+    maxWidth: 1080,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 20,
+  },
+  column: {
+    gap: 16,
+  },
+  columnHalf: {
     flex: 1,
-    backgroundColor: AntigravityPalette.canvas,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingTop: 52,
-    paddingBottom: 36,
-    paddingHorizontal: 18,
-  },
-  storageBanner: {
+  identityCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
     backgroundColor: AntigravityPalette.surface,
-    borderRadius: Radii.bento,
+    borderRadius: 20,
     padding: 18,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    gap: 8,
   },
-  storageHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  avatarLarge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: AntigravityPalette.obsidian,
     alignItems: "center",
+    justifyContent: "center",
   },
-  storageBannerTitle: {
-    fontSize: 16,
+  avatarLargeText: {
+    color: AntigravityPalette.canvas,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  identityTextCol: {
+    flex: 1,
+  },
+  identityName: {
+    fontSize: 17,
     fontWeight: "600",
     color: AntigravityPalette.obsidian,
+    letterSpacing: -0.2,
   },
-  pillCount: {
-    backgroundColor: AntigravityPalette.blueTint,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radii.pill,
-  },
-  pillCountText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: AntigravityPalette.cobaltBlue,
-  },
-  storageBannerDesc: {
+  identityRole: {
     fontSize: 13,
     color: AntigravityPalette.slate,
+    marginTop: 2,
   },
-  boldText: {
-    fontWeight: "700",
-    color: AntigravityPalette.obsidian,
-  },
-  storageTimestamp: {
-    fontSize: 12,
+  updatedCaption: {
+    fontSize: 11,
     color: AntigravityPalette.muted,
-  },
-  storageButtonsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 6,
-  },
-  pillBtnPrimary: {
-    backgroundColor: AntigravityPalette.obsidian,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: Radii.pill,
-  },
-  pillBtnPrimaryText: {
-    color: AntigravityPalette.canvas,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  pillBtnSecondary: {
-    backgroundColor: AntigravityPalette.surfaceAlt,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: Radii.pill,
-  },
-  pillBtnSecondaryText: {
-    color: AntigravityPalette.obsidian,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  pillBtnDanger: {
-    backgroundColor: AntigravityPalette.coralTint,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: Radii.pill,
-  },
-  pillBtnDangerText: {
-    color: AntigravityPalette.coralRed,
-    fontSize: 12,
-    fontWeight: "600",
+    marginTop: 4,
   },
   card: {
     backgroundColor: AntigravityPalette.surface,
-    borderRadius: Radii.bento,
+    borderRadius: 20,
     padding: 20,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
-  securityNotice: {
-    backgroundColor: AntigravityPalette.amberTint,
-    borderRadius: Radii.input,
-    padding: 12,
-    marginBottom: 12,
-  },
-  securityNoticeText: {
-    fontSize: 12,
-    color: "#92400E",
-    lineHeight: 18,
-    fontWeight: "500",
-  },
-  statusMensagem: {
-    textAlign: "center",
-    color: AntigravityPalette.cobaltBlue,
-    fontSize: 13,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: "600",
-    marginBottom: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: AntigravityPalette.blueTint,
-    borderRadius: Radii.input,
-  },
-  acoesContainer: {
-    marginTop: 8,
-    gap: 10,
-  },
-  ctaObsidian: {
-    minHeight: 48,
-    backgroundColor: AntigravityPalette.obsidian,
-    borderRadius: Radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-  },
-  ctaObsidianText: {
-    color: AntigravityPalette.canvas,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  ctaSlate: {
-    minHeight: 48,
-    backgroundColor: AntigravityPalette.surfaceAlt,
-    borderRadius: Radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 13,
-  },
-  ctaSlateText: {
     color: AntigravityPalette.obsidian,
-    fontSize: 14,
-    fontWeight: "600",
+    marginBottom: 14,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: AntigravityPalette.border,
   },
-  pressableArea: {
-    marginTop: 14,
-    minHeight: 48,
-    paddingVertical: 13,
-    borderRadius: Radii.pill,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: AntigravityPalette.electricBlue,
-    backgroundColor: AntigravityPalette.canvas,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressablePressed: {
-    backgroundColor: AntigravityPalette.blueTint,
-  },
-  pressableText: {
-    color: AntigravityPalette.cobaltBlue,
+  fieldLabel: {
     fontSize: 13,
     fontWeight: "600",
+    color: AntigravityPalette.slate,
+    marginTop: 6,
+    marginBottom: 10,
   },
-  previewTexto: {
-    fontSize: 13,
-    color: AntigravityPalette.emerald,
-    backgroundColor: AntigravityPalette.emeraldTint,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: Radii.input,
-    marginBottom: 12,
-    fontWeight: "600",
-  },
-  focoIndicador: {
-    fontSize: 13,
-    color: AntigravityPalette.cobaltBlue,
-    backgroundColor: AntigravityPalette.blueTint,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: Radii.input,
-    marginBottom: 12,
-    fontWeight: "600",
-  },
-  switchContainer: {
+  shiftsGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginVertical: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  shiftChip: {
     backgroundColor: AntigravityPalette.canvas,
-    borderRadius: Radii.input,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
   },
-  switchTexto: {
-    flex: 1,
-    fontSize: 13,
+  shiftChipActive: {
+    backgroundColor: AntigravityPalette.obsidian,
+    borderColor: AntigravityPalette.obsidian,
+  },
+  shiftChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: AntigravityPalette.slate,
+  },
+  shiftChipTextActive: {
+    color: AntigravityPalette.canvas,
     fontWeight: "600",
+  },
+  privacyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: AntigravityPalette.blueTint,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  privacyBannerText: {
+    flex: 1,
+    fontSize: 12,
     color: AntigravityPalette.obsidian,
+    lineHeight: 17,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: AntigravityPalette.canvas,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+    gap: 12,
+    marginBottom: 14,
+  },
+  switchTextCol: {
+    flex: 1,
+  },
+  switchLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: AntigravityPalette.obsidian,
+  },
+  statusFeedback: {
+    fontSize: 12,
+    color: AntigravityPalette.slate,
+    textAlign: "center",
+    marginBottom: 14,
+  },
+  actionsStack: {
+    alignItems: "center",
+    gap: 12,
+  },
+  primarySaveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: AntigravityPalette.obsidian,
+    paddingVertical: 13,
+    paddingHorizontal: 32,
+    borderRadius: Radii.pill,
+    minWidth: 220,
+  },
+  primarySaveBtnText: {
+    color: AntigravityPalette.canvas,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  secondaryButtonsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  secondaryPillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: AntigravityPalette.canvas,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
+  },
+  secondaryPillText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: AntigravityPalette.obsidian,
+  },
+  dangerPillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: AntigravityPalette.coralTint,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: Radii.pill,
+  },
+  dangerPillText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: AntigravityPalette.coralRed,
   },
 });

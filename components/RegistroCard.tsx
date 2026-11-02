@@ -1,4 +1,5 @@
 import { AntigravityPalette, Radii } from '@/constants/theme';
+import Feather from '@expo/vector-icons/Feather';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -17,15 +18,24 @@ export type RegistroCardProps = {
 function getBadgeStyle(categoria: string) {
   const cat = categoria.toLowerCase();
   if (cat.includes('entrada') || cat.includes('retorno')) {
-    return { bg: AntigravityPalette.emeraldTint, text: AntigravityPalette.emerald };
+    return {
+      bg: AntigravityPalette.emeraldTint,
+      text: AntigravityPalette.emerald,
+    };
   }
   if (cat.includes('extra') || cat.includes('visita')) {
     return { bg: AntigravityPalette.amberTint, text: '#B45309' };
   }
   if (cat.includes('saída')) {
-    return { bg: AntigravityPalette.coralTint, text: AntigravityPalette.coralRed };
+    return {
+      bg: AntigravityPalette.coralTint,
+      text: AntigravityPalette.coralRed,
+    };
   }
-  return { bg: AntigravityPalette.blueTint, text: AntigravityPalette.cobaltBlue };
+  return {
+    bg: AntigravityPalette.blueTint,
+    text: AntigravityPalette.cobaltBlue,
+  };
 }
 
 export const RegistroCard = React.memo(function RegistroCard({
@@ -43,7 +53,7 @@ export const RegistroCard = React.memo(function RegistroCard({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.78}
+      activeOpacity={0.76}
       onPress={onPress}
       style={[
         styles.card,
@@ -51,23 +61,53 @@ export const RegistroCard = React.memo(function RegistroCard({
       ]}
     >
       <View style={styles.header}>
-        <Text style={styles.titulo} numberOfLines={1}>
-          {titulo}
-        </Text>
-        <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
-          <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
-            {categoria}
+        <View style={styles.titleGroup}>
+          <Text style={styles.titulo} numberOfLines={1}>
+            {titulo}
           </Text>
+          {modoCompacto && (
+            <Text style={styles.compactDate} numberOfLines={1}>
+              {dataHora}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.rightHeader}>
+          <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
+            <Text style={[styles.badgeText, { color: badgeStyle.text }]}>
+              {categoria}
+            </Text>
+          </View>
+          <Feather
+            name="chevron-right"
+            size={16}
+            color={AntigravityPalette.muted}
+          />
         </View>
       </View>
 
       {!modoCompacto && (
         <View style={styles.body}>
-          <Text style={styles.dataHora}>⏱ {dataHora}</Text>
+          <View style={styles.metaLine}>
+            <Feather
+              name="clock"
+              size={13}
+              color={AntigravityPalette.slate}
+            />
+            <Text style={styles.dataHora}>{dataHora}</Text>
+          </View>
+
           {localizacao ? (
-            <Text style={styles.localizacao} numberOfLines={1}>
-              📍 {localizacao}
-            </Text>
+            <View style={styles.metaLine}>
+              <Feather
+                name="map-pin"
+                size={13}
+                color={AntigravityPalette.muted}
+              />
+              <Text style={styles.localizacao} numberOfLines={1}>
+                {localizacao}
+              </Text>
+            </View>
           ) : null}
 
           <View style={styles.pillsRow}>
@@ -81,6 +121,15 @@ export const RegistroCard = React.memo(function RegistroCard({
                 },
               ]}
             >
+              <Feather
+                name={sincronizadoApi ? 'check' : 'smartphone'}
+                size={11}
+                color={
+                  sincronizadoApi
+                    ? AntigravityPalette.emerald
+                    : AntigravityPalette.slate
+                }
+              />
               <Text
                 style={[
                   styles.metaPillText,
@@ -91,19 +140,29 @@ export const RegistroCard = React.memo(function RegistroCard({
                   },
                 ]}
               >
-                {sincronizadoApi ? '● API Sync' : '○ Local Storage'}
+                {sincronizadoApi ? 'Sincronizado' : 'Salvo no aparelho'}
               </Text>
             </View>
 
             {temFoto && (
               <View style={styles.metaPill}>
-                <Text style={styles.metaPillText}>📷 Foto</Text>
+                <Feather
+                  name="camera"
+                  size={11}
+                  color={AntigravityPalette.obsidian}
+                />
+                <Text style={styles.metaPillText}>Foto anexada</Text>
               </View>
             )}
 
             {temAnexo && (
               <View style={styles.metaPill}>
-                <Text style={styles.metaPillText}>📄 PDF</Text>
+                <Feather
+                  name="file-text"
+                  size={11}
+                  color={AntigravityPalette.obsidian}
+                />
+                <Text style={styles.metaPillText}>Documento</Text>
               </View>
             )}
           </View>
@@ -115,14 +174,14 @@ export const RegistroCard = React.memo(function RegistroCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: AntigravityPalette.surface,
-    borderRadius: Radii.bento,
+    backgroundColor: AntigravityPalette.canvas,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   cardNormal: {
-    padding: 18,
+    padding: 16,
   },
   cardCompacto: {
     paddingVertical: 12,
@@ -134,12 +193,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  titulo: {
+  titleGroup: {
     flex: 1,
-    fontSize: 16,
+    gap: 2,
+  },
+  rightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titulo: {
+    fontSize: 15,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
     letterSpacing: -0.2,
+  },
+  compactDate: {
+    fontSize: 12,
+    color: AntigravityPalette.muted,
   },
   badge: {
     paddingVertical: 4,
@@ -148,12 +219,16 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontWeight: '600',
   },
   body: {
     marginTop: 10,
-    gap: 4,
+    gap: 6,
+  },
+  metaLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   dataHora: {
     fontSize: 13,
@@ -161,6 +236,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   localizacao: {
+    flex: 1,
     fontSize: 13,
     color: AntigravityPalette.muted,
   },
@@ -168,17 +244,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 6,
+    marginTop: 4,
   },
   metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: AntigravityPalette.surfaceAlt,
     paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: Radii.pill,
   },
   metaPillText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
     color: AntigravityPalette.obsidian,
   },
 });
