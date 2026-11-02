@@ -1,13 +1,6 @@
-export type PontoRegistro = {
-  id: string;
-  titulo: string;
-  categoria: string;
-  dataHora: string;
-  localizacao: string;
-  latitude: number;
-  longitude: number;
-  observacao: string;
-};
+import { PontoRegistro } from '@/models/ponto';
+
+export type { PontoRegistro };
 
 export const PONTOS_INICIAIS: PontoRegistro[] = [
   {
@@ -19,6 +12,7 @@ export const PONTOS_INICIAIS: PontoRegistro[] = [
     latitude: -15.7942,
     longitude: -47.8822,
     observacao: 'Registro confirmado via biometria facial e geolocalização.',
+    sincronizadoApi: true,
   },
   {
     id: '2',
@@ -29,6 +23,7 @@ export const PONTOS_INICIAIS: PontoRegistro[] = [
     latitude: -15.7945,
     longitude: -47.8825,
     observacao: 'Saída de intervalo regular de 1 hora.',
+    sincronizadoApi: true,
   },
   {
     id: '3',
@@ -39,6 +34,7 @@ export const PONTOS_INICIAIS: PontoRegistro[] = [
     latitude: -15.7941,
     longitude: -47.8821,
     observacao: 'Retorno pontual de intervalo intrajornada.',
+    sincronizadoApi: true,
   },
   {
     id: '4',
@@ -49,6 +45,7 @@ export const PONTOS_INICIAIS: PontoRegistro[] = [
     latitude: -15.7948,
     longitude: -47.8819,
     observacao: 'Fim de jornada normal cumprida com sucesso.',
+    sincronizadoApi: true,
   },
   {
     id: '5',
@@ -59,5 +56,6 @@ export const PONTOS_INICIAIS: PontoRegistro[] = [
     latitude: -15.8012,
     longitude: -47.8935,
     observacao: 'Autorizado previamente pela coordenação técnica.',
+    sincronizadoApi: true,
   },
 ];

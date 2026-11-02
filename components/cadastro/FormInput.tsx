@@ -1,10 +1,11 @@
+import { AntigravityPalette, Radii } from '@/constants/theme';
 import React from 'react';
 import {
   StyleSheet,
   Text,
   TextInput,
-  View,
   TextInputProps,
+  View,
 } from 'react-native';
 
 interface FormInputProps extends TextInputProps {
@@ -32,7 +33,7 @@ export function FormInput({
           focado && styles.inputFocado,
           style,
         ]}
-        placeholderTextColor="#888"
+        placeholderTextColor={AntigravityPalette.muted}
         value={value}
         onChangeText={onChangeText}
         onFocus={(e) => {
@@ -55,24 +56,25 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#11181C',
+    color: AntigravityPalette.obsidian,
     marginBottom: 6,
+    letterSpacing: -0.1,
   },
   input: {
-    height: 48,
+    minHeight: 48,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#ffffff',
+    borderColor: AntigravityPalette.border,
+    borderRadius: Radii.input,
+    paddingHorizontal: 14,
+    backgroundColor: AntigravityPalette.canvas,
     fontSize: 15,
-    color: '#11181C',
+    color: AntigravityPalette.obsidian,
   },
   inputFocado: {
-    borderColor: '#0a7ea4',
+    borderColor: AntigravityPalette.electricBlue,
     borderWidth: 1.5,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: AntigravityPalette.blueTint,
   },
 });

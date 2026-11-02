@@ -1,3 +1,4 @@
+import { AntigravityPalette, Radii } from '@/constants/theme';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
@@ -9,7 +10,7 @@ interface BotaoCadastroProps {
 
 export function BotaoCadastro({
   onPress,
-  title = 'Cadastrar',
+  title = 'Salvar Perfil',
   disabled = false,
 }: BotaoCadastroProps) {
   return (
@@ -17,7 +18,7 @@ export function BotaoCadastro({
       style={[styles.button, disabled && styles.buttonDisabled]}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.8}
+      activeOpacity={0.82}
     >
       <Text style={styles.buttonText}>{title}</Text>
     </TouchableOpacity>
@@ -26,18 +27,21 @@ export function BotaoCadastro({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#0a7ea4',
+    minHeight: 48,
+    backgroundColor: AntigravityPalette.obsidian,
     paddingVertical: 14,
-    borderRadius: 8,
+    paddingHorizontal: 22,
+    borderRadius: Radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: AntigravityPalette.muted,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: AntigravityPalette.canvas,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
 });
