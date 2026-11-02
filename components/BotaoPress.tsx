@@ -1,15 +1,15 @@
 import { AntigravityPalette, Radii } from "@/constants/theme";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text } from "react-native";
 
-interface BotaoPressProps {
+export interface BotaoPressProps {
   titulo: string;
   onPress: () => void;
   cor?: string;
-  variante?: "primary" | "secondary" | "danger";
+  variante?: "primary" | "secondary" | "danger" | "blue";
 }
 
-const BotaoPress: React.FC<BotaoPressProps> = ({
+export const BotaoPress: React.FC<BotaoPressProps> = ({
   titulo,
   onPress,
   cor,
@@ -45,6 +45,8 @@ const BotaoPress: React.FC<BotaoPressProps> = ({
       ? AntigravityPalette.surfaceAlt
       : variante === "danger"
       ? AntigravityPalette.coralRed
+      : variante === "blue"
+      ? AntigravityPalette.electricBlue
       : AntigravityPalette.obsidian);
 
   const corTexto =
@@ -79,11 +81,13 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 24,
     borderRadius: Radii.pill,
+    marginTop: 8,
   },
   texto: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     letterSpacing: -0.1,
+    textAlign: "center",
   },
 });
 

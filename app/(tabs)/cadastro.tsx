@@ -14,7 +14,7 @@ import {
   salvarPerfilStorage,
   salvarTurnoFavoritoStorage,
 } from "@/services/storageService";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -45,22 +45,17 @@ export default function CadastroScreen() {
   const [chavesGravadas, setChavesGravadas] = useState<string[]>([]);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
 
-  // Carrega automaticamente dados persistidos ao abrir a tela (Aula 19)
-  useEffect(() => {
-    carregarDadosPersistidos();
-  }, []);
-
-  async function atualizarListaChaves() {
+  const atualizarListaChaves = useCallback(async () => {
     try {
       const keys = await listarChavesStorage();
       setChavesGravadas([...keys]);
     } catch (erro) {
       console.error("Erro ao listar chaves:", erro);
     }
-  }
+  }, []);
 
   // Prática 1 e 5 (Aula 19): Recuperar Dados com getItem + JSON.parse
-  async function carregarDadosPersistidos() {
+  const carregarDadosPersistidos = useCallback(async () => {
     try {
       const [perfilSalvo, turnoSalvo] = await Promise.all([
         carregarPerfilStorage(),
@@ -93,7 +88,12 @@ export default function CadastroScreen() {
       console.error("Erro ao carregar do AsyncStorage:", erro);
       setStatusMensagem("Erro ao ler dados do AsyncStorage.");
     }
-  }
+  }, [atualizarListaChaves]);
+
+  // Carrega automaticamente dados persistidos ao abrir a tela (Aula 19)
+  useEffect(() => {
+    carregarDadosPersistidos();
+  }, [carregarDadosPersistidos]);
 
   // Eventos do Lab 4
   function handleSave() {
