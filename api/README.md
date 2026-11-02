@@ -12,7 +12,7 @@ npm start
 
 Por padrão, o servidor escuta na porta `3000` (`http://localhost:3000`).
 
-> **Dispositivo Físico (Expo Go):** Caso execute o aplicativo no celular físico conectado ao Wi-Fi, descubra o IPv4 da máquina (`ipconfig` no Windows) e atualize o campo de URL da API na aba **Perfil & Storage** do aplicativo para `http://SEU_IP_LOCAL:3000`.
+> **Dispositivo Físico (Expo Go):** Caso execute o aplicativo no celular físico conectado ao Wi-Fi, descubra o IPv4 da máquina (`ipconfig` no Windows) e atualize o campo de URL do servidor na aba **Meu Perfil** do aplicativo para `http://SEU_IP_LOCAL:3000`.
 
 ---
 
@@ -32,4 +32,4 @@ Por padrão, o servidor escuta na porta `3000` (`http://localhost:3000`).
 - **`GET /filmes`**, **`GET /filmes/:id`**, **`POST /filmes`**, **`PUT /filmes/:id`** e **`DELETE /filmes/:id`** seguindo exatamente a especificação dos slides da Aula 18 (`titulo` e `diretor`).
 
 ### 4. Recebimento de Arquivos via `FormData` (Aula 21)
-- **`POST /upload`**: Recebe envios `multipart/form-data` disparados pela aba **Arquivos & Mídia** (`201 Created`).
+- **`POST /upload`**: Recebe envios `multipart/form-data` disparados pela aba **Documentos** (`201 Created`).

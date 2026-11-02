@@ -6,6 +6,13 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
+## [2.2.3] - 2026-11-02 (Documentação Atualizada e Remoção de Emojis no README)
+
+### Alterado
+- **Atualização do `README.md` e `api/README.md`**: Inclusão da arquitetura com `components/AppShell.tsx`, instruções para Expo SDK 58, documentação da geocodificação reversa, grade 2x2 de turnos, tabela completa de tags SemVer (`v1.0.0` até `v2.2.3`) e remoção integral de emojis da documentação.
+
+---
+
 ## [2.2.2] - 2026-11-02 (Grade 2x2 de Turnos e Endereço Aproximado via Geocodificação Reversa)
 
 ### Adicionado
