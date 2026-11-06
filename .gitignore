@@ -39,6 +39,7 @@ yarn-error.*
 .claude/
 AGENTS.md
 CLAUDE.md
+CONTEXTO_PROJETO.md
 *.sublime-project
 *.sublime-workspace
 
