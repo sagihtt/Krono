@@ -26,35 +26,21 @@ Tokens de design aplicados em `constants/theme.ts`, `components/AppShell.tsx` e 
 
 ## Registros Visuais da Aplicação (Interface Mobile)
 
-A interface móvel adota Bento Grids, cartões modulares e botões pílula com tipografia de alto contraste inspirada nas diretrizes visuais do Google Antigravity.
+A interface móvel adota Bento Grids, cartões modulares e botões pílula com tipografia de alto contraste inspirada nas diretrizes visuais do Google Antigravity. As capturas abaixo ilustram o fluxo completo de registro, consulta, auditoria e gestão:
 
-### Jornada em Tempo Real e Registro
-Relógio digital síncrono, seleção de tipo de marcação (Entrada, Intervalo, Retorno, Saída, Hora Extra), endereço aproximado via geocodificação reversa e atalho para o mapa.
-![Jornada e Registro](docs/screenshots/01-mobile-jornada.png)
+### Fluxo Operacional de Registro de Ponto
 
-### Histórico de Marcações e Alternância de Densidade
-Lista de marcações com badges semânticos de categoria e sincronização, atalho para comprovante e controle de exibição compacta.
-![Histórico de Marcações](docs/screenshots/02-mobile-historico.png)
+| 01. Jornada Principal | 02. Histórico de Ponto | 03. Menu Lateral Deslizante |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01-mobile-jornada.png" width="260" alt="Jornada Principal" /> | <img src="docs/screenshots/02-mobile-historico.png" width="260" alt="Histórico de Ponto" /> | <img src="docs/screenshots/03-mobile-menu-lateral.png" width="260" alt="Menu Lateral" /> |
+| Relógio em tempo real, seleção de tipo de ponto e geolocalização com mapa | Histórico com badges de sincronização e alternância de densidade compacta | Menu gaveta estilo Gemini com registros recentes e atalhos rápidos |
 
-### Menu Lateral Deslizante (Drawer)
-Navegação rápida estilo Gemini com atalhos diretos, lista de registros recentes, controle de densidade e identificação do colaborador.
-![Menu Lateral](docs/screenshots/03-mobile-menu-lateral.png)
+### Gestão Documental, Perfil e Comprovantes
 
-### Central de Documentos e Anexos
-Abono de horas com envio de atestados em PDF (`expo-document-picker`), anexos fotográficos (`expo-image-picker`), geração de espelho mensal e compartilhamento.
-![Documentos e Anexos](docs/screenshots/04-mobile-documentos.png)
-
-### Perfil do Colaborador e Dados Cadastrais
-Formulário com máscaras para CPF, telefone e datas, campos de dados pessoais e validação de segurança.
-![Perfil do Colaborador](docs/screenshots/05-mobile-perfil.png)
-
-### Grade de Turnos e Preferências de Acesso
-Seletor simétrico 2x2 para turnos de trabalho (Diurno, Flexível, 12x36 e Remoto/Híbrido) com persistência local em AsyncStorage.
-![Grade de Turnos](docs/screenshots/06-mobile-perfil-turnos.png)
-
-### Comprovante Digital Detalhado
-Rota dinâmica (`/detalhes/[id]`) com código do comprovante, categoria, horário preciso, endereço geolocalizado, observações e ações de compartilhamento e exclusão.
-![Comprovante Digital](docs/screenshots/07-mobile-comprovante.png)
+| 04. Anexos e Documentos | 05. Dados Cadastrais | 06. Grade de Turnos 2x2 | 07. Comprovante Digital |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/04-mobile-documentos.png" width="200" alt="Documentos" /> | <img src="docs/screenshots/05-mobile-perfil.png" width="200" alt="Perfil" /> | <img src="docs/screenshots/06-mobile-perfil-turnos.png" width="200" alt="Grade de Turnos" /> | <img src="docs/screenshots/07-mobile-comprovante.png" width="200" alt="Comprovante" /> |
+| Atestados em PDF, fotos e geração de espelho mensal | Dados do colaborador com máscaras dinâmicas de validação | Seletor simétrico de turnos com persistência em AsyncStorage | Rota dinâmica com geocodificação reversa e compartilhamento |
 
 ---
 

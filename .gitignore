@@ -33,6 +33,15 @@ yarn-error.*
 # local env files
 .env*.local
 
+# IDEs and local tooling
+.vscode/
+.idea/
+.claude/
+AGENTS.md
+CLAUDE.md
+*.sublime-project
+*.sublime-workspace
+
 # typescript
 *.tsbuildinfo
 
