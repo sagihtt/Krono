@@ -2,6 +2,9 @@
 
 Aplicativo multiplataforma (Android, iOS e Web Responsiva) em **React Native (Expo SDK 58 + Expo Router)** acompanhado de servidor **Node.js + Express**.
 
+[![Android APK](https://img.shields.io/badge/Download-APK%20Android-00B95C?logo=android&logoColor=white)](https://github.com/sagihtt/krono/releases/latest)
+[![EAS Build](https://img.shields.io/badge/EAS%20Build-Finished-3186FF?logo=expo&logoColor=white)](https://expo.dev/accounts/sagihtt/projects/registrodeponto/builds)
+
 
 ---
 
@@ -105,5 +108,19 @@ npx expo start
 
 - Pressione **`w`** para abrir no navegador Web.
 - Pressione **`a`** para abrir no emulador Android ou escaneie o QR Code no aplicativo **Expo Go (SDK 58)**.
+
+### 3. Instalação Direta no Android (APK Standalone)
+
+Para instalar o aplicativo diretamente em qualquer smartphone Android sem depender do Expo Go:
+
+1. Acesse a aba de [Releases](https://github.com/sagihtt/krono/releases) do repositório e baixe o instalador `krono-v2.2.3.apk`.
+2. Transfira o arquivo para o seu dispositivo móvel ou faça o download diretamente pelo navegador do celular.
+3. Autorize a instalação de fontes desconhecidas nas configurações do Android e conclua a instalação.
+
+Para reproduzir o empacotamento com o EAS CLI:
+
+```bash
+npx eas-cli build -p android --profile preview
+```
 
 ---

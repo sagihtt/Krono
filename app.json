@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "registroDePonto",
-    "slug": "registroDePonto",
+    "name": "Krono",
+    "slug": "registrodeponto",
     "version": "2.2.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.sagihtt.krono",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,6 +45,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "52463c72-4f4f-4cd0-86af-f0509023b608"
+      }
     }
   }
 }

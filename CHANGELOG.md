@@ -6,10 +6,14 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
-## [2.2.3] - 2026-11-02 (Documentação Atualizada e Remoção de Emojis no README)
+## [2.2.3] - 2026-11-06 (Configuração do EAS Build e Pacote Android)
+
+### Adicionado
+- **Configuração de Build Nativo para Android (`eas.json`)**: Perfil de compilação `preview` configurado com `buildType: "apk"` para empacotamento na nuvem via EAS Build.
+- **Identificador de Pacote Android (`app.json`)**: Configurado `package: "com.sagihtt.krono"` e nome de exibição padronizado para `Krono`.
 
 ### Alterado
-- **Atualização do `README.md` e `api/README.md`**: Inclusão da arquitetura com `components/AppShell.tsx`, instruções para Expo SDK 58, documentação da geocodificação reversa, grade 2x2 de turnos, tabela completa de tags SemVer (`v1.0.0` até `v2.2.3`) e remoção integral de emojis da documentação.
+- **Atualização do `README.md` e `api/README.md`**: Inclusão de instruções de instalação do APK independente, badges de status do build e links diretos para as releases do GitHub.
 
 ---
 
