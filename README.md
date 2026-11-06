@@ -1,8 +1,7 @@
 # Krono: Gestão de Jornada e Frequência (`v2.2.3` • Expo SDK 58)
 
-Aplicativo multiplataforma (Android, iOS e Web Responsiva) em **React Native (Expo SDK 58 + Expo Router)** acompanhado de servidor **Node.js + Express**, evoluído desde os **Laboratórios 1 a 5** até cumprir todos os requisitos das **Aulas 16 a 21** de Programação para Dispositivos Móveis.
+Aplicativo multiplataforma (Android, iOS e Web Responsiva) em **React Native (Expo SDK 58 + Expo Router)** acompanhado de servidor **Node.js + Express**.
 
-A interface adota o sistema visual extraído do portal **[https://antigravity.google/](https://antigravity.google/)**, combinando tipografia de alto contraste, cartões modulares, botões centralizados em formato pílula e navegação adaptativa com menu lateral deslizante no celular e barra lateral fixa com layout de duas colunas na Web.
 
 ---
 
