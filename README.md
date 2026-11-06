@@ -24,6 +24,40 @@ Tokens de design aplicados em `constants/theme.ts`, `components/AppShell.tsx` e 
 
 ---
 
+## Registros Visuais da Aplicação (Interface Mobile)
+
+A interface móvel adota Bento Grids, cartões modulares e botões pílula com tipografia de alto contraste inspirada nas diretrizes visuais do Google Antigravity.
+
+### Jornada em Tempo Real e Registro
+Relógio digital síncrono, seleção de tipo de marcação (Entrada, Intervalo, Retorno, Saída, Hora Extra), endereço aproximado via geocodificação reversa e atalho para o mapa.
+![Jornada e Registro](docs/screenshots/01-mobile-jornada.png)
+
+### Histórico de Marcações e Alternância de Densidade
+Lista de marcações com badges semânticos de categoria e sincronização, atalho para comprovante e controle de exibição compacta.
+![Histórico de Marcações](docs/screenshots/02-mobile-historico.png)
+
+### Menu Lateral Deslizante (Drawer)
+Navegação rápida estilo Gemini com atalhos diretos, lista de registros recentes, controle de densidade e identificação do colaborador.
+![Menu Lateral](docs/screenshots/03-mobile-menu-lateral.png)
+
+### Central de Documentos e Anexos
+Abono de horas com envio de atestados em PDF (`expo-document-picker`), anexos fotográficos (`expo-image-picker`), geração de espelho mensal e compartilhamento.
+![Documentos e Anexos](docs/screenshots/04-mobile-documentos.png)
+
+### Perfil do Colaborador e Dados Cadastrais
+Formulário com máscaras para CPF, telefone e datas, campos de dados pessoais e validação de segurança.
+![Perfil do Colaborador](docs/screenshots/05-mobile-perfil.png)
+
+### Grade de Turnos e Preferências de Acesso
+Seletor simétrico 2x2 para turnos de trabalho (Diurno, Flexível, 12x36 e Remoto/Híbrido) com persistência local em AsyncStorage.
+![Grade de Turnos](docs/screenshots/06-mobile-perfil-turnos.png)
+
+### Comprovante Digital Detalhado
+Rota dinâmica (`/detalhes/[id]`) com código do comprovante, categoria, horário preciso, endereço geolocalizado, observações e ações de compartilhamento e exclusão.
+![Comprovante Digital](docs/screenshots/07-mobile-comprovante.png)
+
+---
+
 ## Arquitetura Modular de Pastas (Aula 16)
 
 ```text
