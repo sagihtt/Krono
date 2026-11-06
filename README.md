@@ -25,7 +25,7 @@ Tokens de design aplicados em `constants/theme.ts`, `components/AppShell.tsx` e 
 
 ## Registros Visuais da Aplicação (Interface Mobile)
 
-A interface móvel adota Bento Grids, cartões modulares e botões pílula com tipografia de alto contraste inspirada nas diretrizes visuais do Google Antigravity. As capturas abaixo ilustram o fluxo completo de registro, consulta, auditoria e gestão:
+As capturas abaixo ilustram o fluxo completo de registro, consulta, auditoria e gestão:
 
 ### Fluxo Operacional de Registro de Ponto
 
@@ -43,11 +43,11 @@ A interface móvel adota Bento Grids, cartões modulares e botões pílula com t
 
 ---
 
-## Arquitetura Modular de Pastas (Aula 16)
+## Arquitetura Modular de Pastas 
 
 ```text
 registroDePonto/
-├── api/                          # Servidor Backend Node.js + Express (Aulas 17 e 18)
+├── api/                          # Servidor Backend Node.js + Express 
 │   ├── package.json
 │   ├── README.md
 │   └── server.js                 # Rotas /clima, CRUD /pontos, CRUD /filmes e POST /upload
@@ -67,11 +67,11 @@ registroDePonto/
 │   ├── RegistroCard.tsx          # Card otimizado com React.memo e badges semânticos
 │   └── cadastro/                 # Inputs com máscara, PickerModal e Checkbox
 ├── constants/
-│   ├── pontosMock.ts             # 5 registros iniciais padronizados (Labs 1-5)
+│   ├── pontosMock.ts             # 5 registros iniciais padronizados 
 │   └── theme.ts                  # Paleta AntigravityPalette, Radii e fontes
 ├── models/
 │   └── ponto.ts                  # Contratos TypeScript (PontoRegistro, PerfilColaborador, AnexoDocumento)
-├── services/                     # Camada de serviços isolada da interface (Aula 16)
+├── services/                     # Camada de serviços isolada da interface 
 │   ├── apiService.ts             # Cliente HTTP fetch() para GET, POST, PUT, DELETE e FormData
 │   └── storageService.ts         # Persistência local com AsyncStorage e serialização JSON
 ├── CHANGELOG.md                  # Histórico completo do Versionamento Semântico (v1.0.0 a v2.2.3)
