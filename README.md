@@ -65,8 +65,11 @@ O projeto implementa e integra os seguintes recursos nativos do dispositivo móv
 ## 5. APK de Instalação e Repositório Git
 
 - **Repositório no GitHub:** [https://github.com/sagihtt/Krono](https://github.com/sagihtt/Krono)
-- **Download Direto do APK (Versão Final `v2.2.3`):** [krono-v2.2.3.apk](https://github.com/sagihtt/Krono/releases/download/v2.2.3/krono-v2.2.3.apk)
-- **Página da Release Oficial:** [https://github.com/sagihtt/Krono/releases/tag/v2.2.3](https://github.com/sagihtt/Krono/releases/tag/v2.2.3)
+- **Download Direto do APK (GitHub Release `v2.2.3`):** [krono-v2.2.3.apk](https://github.com/sagihtt/Krono/releases/download/v2.2.3/krono-v2.2.3.apk)
+- **Download Direto do APK (Servidor EAS / Expo):** [KW4ZErTpon5fZR-VearXP3fUFnlTPSWBb3SNOv6RtTk.apk](https://expo.dev/artifacts/eas/KW4ZErTpon5fZR-VearXP3fUFnlTPSWBb3SNOv6RtTk.apk)
+- **Página da Compilação no Expo (EAS Build + Logs):** [Build `56fd37cd-8630-485b-8a1a-43f5a9c36743`](https://expo.dev/accounts/sagihtt/projects/registrodeponto/builds/56fd37cd-8630-485b-8a1a-43f5a9c36743)
+- **Painel Geral de Builds no Expo:** [https://expo.dev/accounts/sagihtt/projects/registrodeponto/builds](https://expo.dev/accounts/sagihtt/projects/registrodeponto/builds)
+- **Página da Release Oficial no GitHub:** [https://github.com/sagihtt/Krono/releases/tag/v2.2.3](https://github.com/sagihtt/Krono/releases/tag/v2.2.3)
 
 ---
 
