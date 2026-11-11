@@ -5,24 +5,51 @@ import {
   PreferenciasApp,
 } from '@/models/ponto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_API_BASE_URL } from './apiService';
+
+export const PRODUCTION_API_BASE_URL = 'https://krono.engine.lat/api';
+export const DEFAULT_API_URL_FALLBACK =
+  process.env.EXPO_PUBLIC_API_URL || PRODUCTION_API_BASE_URL;
 
 export const STORAGE_KEYS = {
   PONTOS: '@antigravity_ponto:registros',
   PERFIL: '@antigravity_ponto:perfil',
   PREFERENCIAS: '@antigravity_ponto:preferencias',
   TURNO_FAVORITO: '@antigravity_ponto:turno_favorito',
+  CLIENT_ID: '@antigravity_ponto:client_id',
 } as const;
 
 export const PREFERENCIAS_PADRAO: PreferenciasApp = {
   modoCompacto: false,
-  turnoFavorito: 'Diurno Comercial (08h às 17h)',
-  apiUrl: DEFAULT_API_BASE_URL,
+  turnoFavorito: 'Diurno (08h às 17h)',
+  apiUrl: DEFAULT_API_URL_FALLBACK,
 };
 
-// ============================================================================
-// PRÁTICA 1 A 3 (AULA 19): String Simples (setItem, getItem, removeItem)
-// ============================================================================
+let cachedClientId: string | null = null;
+
+export async function obterOuCriarClientIdStorage(): Promise<string> {
+  if (cachedClientId) return cachedClientId;
+
+  try {
+    const salvo = await AsyncStorage.getItem(STORAGE_KEYS.CLIENT_ID);
+    if (salvo && salvo.trim().length > 0) {
+      cachedClientId = salvo.trim();
+      return cachedClientId;
+    }
+
+    const novoId = `krono_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    await AsyncStorage.setItem(STORAGE_KEYS.CLIENT_ID, novoId);
+    cachedClientId = novoId;
+    return novoId;
+  } catch {
+    if (!cachedClientId) {
+      cachedClientId = `krono_mem_${Math.random().toString(36).slice(2, 10)}`;
+    }
+    return cachedClientId;
+  }
+}
+
 export async function salvarTurnoFavoritoStorage(turno: string): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.TURNO_FAVORITO, turno);
 }
@@ -35,12 +62,9 @@ export async function removerTurnoFavoritoStorage(): Promise<void> {
   await AsyncStorage.removeItem(STORAGE_KEYS.TURNO_FAVORITO);
 }
 
-// ============================================================================
-// PRÁTICA 5 (AULA 19): Objetos JSON com JSON.stringify() e JSON.parse()
-// Nota de Segurança (Aula 19): Senhas NUNCA são salvas no AsyncStorage por
-// não possuir criptografia padrão.
-// ============================================================================
-export async function salvarPerfilStorage(perfil: PerfilColaborador): Promise<void> {
+export async function salvarPerfilStorage(
+  perfil: PerfilColaborador
+): Promise<void> {
   const payload = JSON.stringify({
     ...perfil,
     atualizadoEm: new Date().toLocaleString('pt-BR'),
@@ -57,29 +81,36 @@ export async function removerPerfilStorage(): Promise<void> {
   await AsyncStorage.removeItem(STORAGE_KEYS.PERFIL);
 }
 
-// ============================================================================
-// PERSISTÊNCIA DA LISTA DE REGISTROS DE PONTO (JSON Array)
-// ============================================================================
-export async function salvarPontosStorage(pontos: PontoRegistro[]): Promise<void> {
+export async function salvarPontosStorage(
+  pontos: PontoRegistro[]
+): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.PONTOS, JSON.stringify(pontos));
 }
 
 export async function carregarPontosStorage(): Promise<PontoRegistro[]> {
   const texto = await AsyncStorage.getItem(STORAGE_KEYS.PONTOS);
-  if (!texto) {
+  if (texto === null) {
     await salvarPontosStorage(PONTOS_INICIAIS);
     return PONTOS_INICIAIS;
   }
-  const lista = JSON.parse(texto) as PontoRegistro[];
-  return Array.isArray(lista) && lista.length > 0 ? lista : PONTOS_INICIAIS;
+  try {
+    const lista = JSON.parse(texto) as PontoRegistro[];
+    return Array.isArray(lista) ? lista : PONTOS_INICIAIS;
+  } catch {
+    return PONTOS_INICIAIS;
+  }
 }
 
-export async function buscarPontoStoragePorId(id: string): Promise<PontoRegistro | null> {
+export async function buscarPontoStoragePorId(
+  id: string
+): Promise<PontoRegistro | null> {
   const lista = await carregarPontosStorage();
   return lista.find((item) => String(item.id) === String(id)) ?? null;
 }
 
-export async function atualizarPontoNoStorage(pontoAtualizado: PontoRegistro): Promise<PontoRegistro[]> {
+export async function atualizarPontoNoStorage(
+  pontoAtualizado: PontoRegistro
+): Promise<PontoRegistro[]> {
   const lista = await carregarPontosStorage();
   const novaLista = lista.map((item) =>
     String(item.id) === String(pontoAtualizado.id) ? pontoAtualizado : item
@@ -88,31 +119,56 @@ export async function atualizarPontoNoStorage(pontoAtualizado: PontoRegistro): P
   return novaLista;
 }
 
-export async function excluirPontoDoStorage(id: string): Promise<PontoRegistro[]> {
+export async function excluirPontoDoStorage(
+  id: string
+): Promise<PontoRegistro[]> {
   const lista = await carregarPontosStorage();
   const novaLista = lista.filter((item) => String(item.id) !== String(id));
   await salvarPontosStorage(novaLista);
   return novaLista;
 }
 
-// ============================================================================
-// PREFERÊNCIAS DO APLICATIVO E MÉTODOS EM LOTE (getAllKeys, multiGet, clear)
-// ============================================================================
-export async function salvarPreferenciasStorage(prefs: PreferenciasApp): Promise<void> {
+export async function salvarPreferenciasStorage(
+  prefs: PreferenciasApp
+): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.PREFERENCIAS, JSON.stringify(prefs));
 }
 
 export async function carregarPreferenciasStorage(): Promise<PreferenciasApp> {
   const texto = await AsyncStorage.getItem(STORAGE_KEYS.PREFERENCIAS);
   if (!texto) return PREFERENCIAS_PADRAO;
-  return { ...PREFERENCIAS_PADRAO, ...(JSON.parse(texto) as Partial<PreferenciasApp>) };
+
+  try {
+    const lido = JSON.parse(texto) as Partial<PreferenciasApp>;
+    const urlSalva = lido.apiUrl?.trim();
+    const urlFinal =
+      !urlSalva || urlSalva === 'http://localhost:3000'
+        ? DEFAULT_API_URL_FALLBACK
+        : urlSalva;
+
+    const turnoSalvo =
+      lido.turnoFavorito === 'Diurno Comercial (08h às 17h)'
+        ? PREFERENCIAS_PADRAO.turnoFavorito
+        : lido.turnoFavorito || PREFERENCIAS_PADRAO.turnoFavorito;
+
+    return {
+      ...PREFERENCIAS_PADRAO,
+      ...lido,
+      turnoFavorito: turnoSalvo,
+      apiUrl: urlFinal,
+    };
+  } catch {
+    return PREFERENCIAS_PADRAO;
+  }
 }
 
 export async function listarChavesStorage(): Promise<readonly string[]> {
   return AsyncStorage.getAllKeys();
 }
 
-export async function inspecionarMultiGetStorage(): Promise<Record<string, string | null>> {
+export async function inspecionarMultiGetStorage(): Promise<
+  Record<string, string | null>
+> {
   const chaves = await AsyncStorage.getAllKeys();
   if (chaves.length === 0) return {};
   const pares = await AsyncStorage.multiGet(chaves);
@@ -124,5 +180,6 @@ export async function inspecionarMultiGetStorage(): Promise<Record<string, strin
 }
 
 export async function limparTodoStorage(): Promise<void> {
+  cachedClientId = null;
   await AsyncStorage.clear();
 }

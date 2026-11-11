@@ -1,10 +1,11 @@
 {
-  "name": "registro-de-ponto-api",
-  "version": "1.2.0",
-  "description": "API RESTful em Node.js e Express para o app Registro de Ponto (Aulas 17 e 18)",
+  "name": "krono-api",
+  "version": "2.3.0",
+  "description": "API REST em Node.js e Express com persistencia em disco para o aplicativo Krono",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test __tests__/server.test.js"
   },
   "dependencies": {
     "express": "^5.1.0"

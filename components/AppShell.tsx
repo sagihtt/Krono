@@ -1,3 +1,4 @@
+import { KronoLogo } from '@/components/KronoLogo';
 import { AntigravityPalette, Radii } from '@/constants/theme';
 import { PerfilColaborador, PontoRegistro } from '@/models/ponto';
 import {
@@ -30,6 +31,7 @@ interface AppShellProps {
   onRefresh?: () => void;
   modoCompacto?: boolean;
   onToggleCompacto?: (val: boolean) => void;
+  showBackButton?: boolean;
   children: React.ReactNode;
 }
 
@@ -61,6 +63,7 @@ export function AppShell({
   onRefresh,
   modoCompacto: modoCompactoProp,
   onToggleCompacto,
+  showBackButton = false,
   children,
 }: AppShellProps) {
   const { width } = useWindowDimensions();
@@ -117,7 +120,7 @@ export function AppShell({
     setDrawerOpen(true);
     Animated.spring(slideAnim, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       speed: 22,
       bounciness: 4,
     }).start();
@@ -127,13 +130,21 @@ export function AppShell({
     Animated.timing(slideAnim, {
       toValue: -310,
       duration: 180,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(() => setDrawerOpen(false));
   };
 
   const navegarPara = (rota: string) => {
     fecharDrawer();
     router.push(rota as any);
+  };
+
+  const voltarOuIrInicio = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
   };
 
   const handleToggleCompacto = async (val: boolean) => {
@@ -159,26 +170,7 @@ export function AppShell({
     <View style={[styles.sidebarInner, inModal && styles.sidebarInnerModal]}>
       <View style={styles.brandHeader}>
         <View style={styles.brandIdentity}>
-          <View style={styles.brandDots}>
-            <View
-              style={[
-                styles.brandDot,
-                { backgroundColor: AntigravityPalette.electricBlue },
-              ]}
-            />
-            <View
-              style={[
-                styles.brandDot,
-                { backgroundColor: AntigravityPalette.coralRed },
-              ]}
-            />
-            <View
-              style={[
-                styles.brandDot,
-                { backgroundColor: AntigravityPalette.solarAmber },
-              ]}
-            />
-          </View>
+          <KronoLogo size={30} />
           <Text style={styles.brandTitle}>Krono</Text>
         </View>
 
@@ -315,7 +307,19 @@ export function AppShell({
         <View style={styles.topBar}>
           <View style={styles.topBarInner}>
             <View style={styles.topBarLeft}>
-              {!isDesktop && (
+              {showBackButton ? (
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={voltarOuIrInicio}
+                  accessibilityLabel="Voltar"
+                >
+                  <Feather
+                    name="arrow-left"
+                    size={19}
+                    color={AntigravityPalette.obsidian}
+                  />
+                </TouchableOpacity>
+              ) : !isDesktop ? (
                 <TouchableOpacity
                   style={styles.menuButton}
                   onPress={abrirDrawer}
@@ -327,7 +331,8 @@ export function AppShell({
                     color={AntigravityPalette.obsidian}
                   />
                 </TouchableOpacity>
-              )}
+              ) : null}
+
               <View style={styles.topBarTextCol}>
                 <Text style={styles.screenTitle} numberOfLines={1}>
                   {title}
@@ -434,19 +439,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  brandDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  brandDot: {
-    width: 5,
-    height: 16,
-    borderRadius: 3,
-  },
   brandTitle: {
     fontSize: 19,
-    fontWeight: '600',
+    fontWeight: '700',
     color: AntigravityPalette.obsidian,
     letterSpacing: -0.5,
   },

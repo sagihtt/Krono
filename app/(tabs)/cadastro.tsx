@@ -63,18 +63,22 @@ export default function CadastroScreen() {
       }
 
       if (perfilSalvo) {
-        setNome(perfilSalvo.nome);
-        setCpf(perfilSalvo.cpf);
-        setEmail(perfilSalvo.email);
-        setTelefone(perfilSalvo.telefone);
-        setDataNascimento(perfilSalvo.dataNascimento);
+        setNome(perfilSalvo.nome || "");
+        setCpf(perfilSalvo.cpf || "");
+        setEmail(perfilSalvo.email || "");
+        setTelefone(perfilSalvo.telefone || "");
+        setDataNascimento(perfilSalvo.dataNascimento || "");
         setCargo(perfilSalvo.cargo || "Engenheiro de Software Mobile");
         setTurnoFavorito(
           perfilSalvo.turnoFavorito || turnoSalvo || "Diurno (08h às 17h)"
         );
-        setAceitaTermos(perfilSalvo.aceitaTermos);
+        setAceitaTermos(Boolean(perfilSalvo.aceitaTermos));
         setUltimaAtualizacao(perfilSalvo.atualizadoEm ?? null);
-        setStatusMensagem(`Perfil de ${perfilSalvo.nome} sincronizado.`);
+        setStatusMensagem(
+          perfilSalvo.nome
+            ? `Perfil de ${perfilSalvo.nome} sincronizado.`
+            : "Complete suas informações abaixo para personalizar seus comprovantes."
+        );
       } else {
         setStatusMensagem(
           "Complete suas informações abaixo para personalizar seus comprovantes."
@@ -94,18 +98,22 @@ export default function CadastroScreen() {
           setTurnoFavorito(turnoSalvo);
         }
         if (perfilSalvo) {
-          setNome(perfilSalvo.nome);
-          setCpf(perfilSalvo.cpf);
-          setEmail(perfilSalvo.email);
-          setTelefone(perfilSalvo.telefone);
-          setDataNascimento(perfilSalvo.dataNascimento);
+          setNome(perfilSalvo.nome || "");
+          setCpf(perfilSalvo.cpf || "");
+          setEmail(perfilSalvo.email || "");
+          setTelefone(perfilSalvo.telefone || "");
+          setDataNascimento(perfilSalvo.dataNascimento || "");
           setCargo(perfilSalvo.cargo || "Engenheiro de Software Mobile");
           setTurnoFavorito(
             perfilSalvo.turnoFavorito || turnoSalvo || "Diurno (08h às 17h)"
           );
-          setAceitaTermos(perfilSalvo.aceitaTermos);
+          setAceitaTermos(Boolean(perfilSalvo.aceitaTermos));
           setUltimaAtualizacao(perfilSalvo.atualizadoEm ?? null);
-          setStatusMensagem(`Perfil de ${perfilSalvo.nome} sincronizado.`);
+          setStatusMensagem(
+            perfilSalvo.nome
+              ? `Perfil de ${perfilSalvo.nome} sincronizado.`
+              : "Complete suas informações abaixo para personalizar seus comprovantes."
+          );
         } else {
           setStatusMensagem(
             "Complete suas informações abaixo para personalizar seus comprovantes."

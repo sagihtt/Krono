@@ -1,0 +1,13 @@
+services:
+  krono-api:
+    build: .
+    container_name: krono-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data

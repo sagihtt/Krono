@@ -1,10 +1,9 @@
 export function maskCPF(value: string): string {
-  return value
-    .replace(/\D/g, '')
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-    .slice(0, 14);
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
 }
 
 export function maskPhone(value: string): string {
@@ -20,9 +19,8 @@ export function maskPhone(value: string): string {
 }
 
 export function maskDate(value: string): string {
-  return value
-    .replace(/\D/g, '')
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  return digits
     .replace(/(\d{2})(\d)/, '$1/$2')
-    .replace(/(\d{2})(\d)/, '$1/$2')
-    .slice(0, 10);
+    .replace(/(\d{2})(\d)/, '$1/$2');
 }

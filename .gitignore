@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Backend local state
+api/data/
+
 # Native
 .kotlin/
 *.orig.*

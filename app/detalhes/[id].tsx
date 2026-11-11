@@ -14,6 +14,7 @@ import {
   carregarPreferenciasStorage,
   excluirPontoDoStorage,
 } from '@/services/storageService';
+import { formatarLinkMapa } from '@/utils/jornada';
 import Feather from '@expo/vector-icons/Feather';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -41,7 +42,10 @@ export default function DetalhesScreen() {
   const [ponto, setPonto] = useState<PontoRegistro | null>(pontoMockInicial);
   const [carregando, setCarregando] = useState<boolean>(true);
   const [modoEdicao, setModoEdicao] = useState<boolean>(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState<boolean>(false);
+  const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE_URL);
+  const [apiOnline, setApiOnline] = useState<boolean>(false);
 
   const [tituloEdit, setTituloEdit] = useState<string>(
     pontoMockInicial?.titulo ?? ''
@@ -72,17 +76,20 @@ export default function DetalhesScreen() {
           const remoto = await buscarPontoPorIdApi(String(id), urlAtiva);
           if (remoto) {
             encontrado = { ...remoto, sincronizadoApi: true };
+            if (ativo) setApiOnline(true);
           }
         } catch {
-          // Segue com registro salvo no dispositivo
+          if (ativo) setApiOnline(false);
         }
 
-        if (ativo && encontrado) {
+        if (ativo) {
           setPonto(encontrado);
-          setTituloEdit(encontrado.titulo);
-          setCategoriaEdit(encontrado.categoria);
-          setLocalizacaoEdit(encontrado.localizacao);
-          setObservacaoEdit(encontrado.observacao);
+          if (encontrado) {
+            setTituloEdit(encontrado.titulo);
+            setCategoriaEdit(encontrado.categoria);
+            setLocalizacaoEdit(encontrado.localizacao);
+            setObservacaoEdit(encontrado.observacao);
+          }
         }
       } catch {
         // Silencioso
@@ -97,9 +104,18 @@ export default function DetalhesScreen() {
     };
   }, [id]);
 
+  const voltarParaHistorico = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
   const salvarAlteracoes = async () => {
     if (!ponto) return;
     if (!tituloEdit.trim() || !categoriaEdit.trim()) {
+      setStatusFeedback('Informe a descrição e a categoria da marcação.');
       Alert.alert(
         'Campos obrigatórios',
         'Informe a descrição e a categoria da marcação.'
@@ -120,22 +136,23 @@ export default function DetalhesScreen() {
       try {
         await atualizarPontoApi(String(ponto.id), atualizado, apiUrl);
         sincronizado = true;
+        setApiOnline(true);
       } catch {
         sincronizado = false;
+        setApiOnline(false);
       }
 
       const registroFinal = { ...atualizado, sincronizadoApi: sincronizado };
       await atualizarPontoNoStorage(registroFinal);
       setPonto(registroFinal);
       setModoEdicao(false);
-
-      Alert.alert('Comprovante atualizado', 'As alterações foram salvas.');
+      setStatusFeedback('Comprovante atualizado.');
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar as alterações.');
+      setStatusFeedback('Não foi possível salvar as alterações.');
     }
   };
 
-  const excluirRegistro = async () => {
+  const confirmarExclusao = async () => {
     if (!ponto) return;
 
     try {
@@ -145,26 +162,26 @@ export default function DetalhesScreen() {
         // Segue com remoção local
       }
       await excluirPontoDoStorage(String(ponto.id));
-      Alert.alert('Marcação removida', 'O registro foi excluído do histórico.');
-      router.back();
+      voltarParaHistorico();
     } catch {
-      Alert.alert('Erro', 'Não foi possível remover o registro.');
+      setStatusFeedback('Não foi possível remover o registro.');
     }
   };
 
   const compartilharComprovante = async () => {
     if (!ponto) return;
+    const linkMapa = formatarLinkMapa(ponto.latitude, ponto.longitude);
     try {
       await Share.share({
         title: `Comprovante de Ponto #${ponto.id}`,
         message:
-          `Comprovante de Ponto — Krono\n` +
+          `Comprovante de Ponto - Krono\n` +
           `Código: #${ponto.id}\n` +
           `Descrição: ${ponto.titulo}\n` +
           `Tipo: ${ponto.categoria}\n` +
           `Horário: ${ponto.dataHora}\n` +
           `Unidade: ${ponto.localizacao}\n` +
-          `Coordenadas: ${ponto.latitude}, ${ponto.longitude}\n` +
+          `Mapa: ${linkMapa}\n` +
           `Observação: ${ponto.observacao}`,
       });
     } catch {
@@ -176,23 +193,67 @@ export default function DetalhesScreen() {
     <AppShell
       title="Comprovante de ponto"
       subtitle="Consulta e ajuste de marcação"
+      onlineStatus={apiOnline}
+      showBackButton
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
           <View style={styles.receiptCard}>
             <View style={styles.topRow}>
               <View style={styles.codeBadge}>
-                <Text style={styles.codeBadgeText}>
-                  ID selecionado: {id}
-                </Text>
+                <Text style={styles.codeBadgeText}>Comprovante #{id}</Text>
               </View>
-              {carregando && (
+              {carregando ? (
                 <ActivityIndicator
                   size="small"
                   color={AntigravityPalette.electricBlue}
                 />
-              )}
+              ) : ponto ? (
+                <View
+                  style={[
+                    styles.syncBadge,
+                    {
+                      backgroundColor: ponto.sincronizadoApi
+                        ? AntigravityPalette.emeraldTint
+                        : AntigravityPalette.surfaceAlt,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={ponto.sincronizadoApi ? 'check' : 'smartphone'}
+                    size={11}
+                    color={
+                      ponto.sincronizadoApi
+                        ? AntigravityPalette.emerald
+                        : AntigravityPalette.slate
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.syncBadgeText,
+                      {
+                        color: ponto.sincronizadoApi
+                          ? AntigravityPalette.emerald
+                          : AntigravityPalette.slate,
+                      },
+                    ]}
+                  >
+                    {ponto.sincronizadoApi ? 'Sincronizado' : 'Salvo no aparelho'}
+                  </Text>
+                </View>
+              ) : null}
             </View>
+
+            {statusFeedback ? (
+              <View style={styles.feedbackBanner}>
+                <Feather
+                  name="check-circle"
+                  size={14}
+                  color={AntigravityPalette.cobaltBlue}
+                />
+                <Text style={styles.feedbackBannerText}>{statusFeedback}</Text>
+              </View>
+            ) : null}
 
             {ponto ? (
               <View style={styles.infoArea}>
@@ -219,7 +280,10 @@ export default function DetalhesScreen() {
                       <TouchableOpacity
                         style={styles.mapBadgeBtn}
                         onPress={() => {
-                          const url = `https://www.google.com/maps/search/?api=1&query=${ponto.latitude},${ponto.longitude}`;
+                          const url = formatarLinkMapa(
+                            ponto.latitude,
+                            ponto.longitude
+                          );
                           Linking.openURL(url).catch(() => {});
                         }}
                       >
@@ -328,45 +392,78 @@ export default function DetalhesScreen() {
 
                 {!modoEdicao && (
                   <View style={styles.actionsSection}>
-                    <View style={styles.centeredButtonsRow}>
-                      <TouchableOpacity
-                        style={styles.sharePillBtn}
-                        onPress={compartilharComprovante}
-                      >
-                        <Feather
-                          name="share-2"
-                          size={14}
-                          color={AntigravityPalette.obsidian}
-                        />
-                        <Text style={styles.sharePillText}>
-                          Enviar comprovante
+                    {!confirmandoExclusao ? (
+                      <View style={styles.centeredButtonsRow}>
+                        <TouchableOpacity
+                          style={styles.sharePillBtn}
+                          onPress={compartilharComprovante}
+                        >
+                          <Feather
+                            name="share-2"
+                            size={14}
+                            color={AntigravityPalette.obsidian}
+                          />
+                          <Text style={styles.sharePillText}>
+                            Enviar comprovante
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.editPillBtn}
+                          onPress={() => {
+                            setStatusFeedback(null);
+                            setModoEdicao(true);
+                          }}
+                        >
+                          <Feather
+                            name="edit-3"
+                            size={14}
+                            color={AntigravityPalette.cobaltBlue}
+                          />
+                          <Text style={styles.editPillText}>Editar dados</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.deletePillBtn}
+                          onPress={() => setConfirmandoExclusao(true)}
+                        >
+                          <Feather
+                            name="trash-2"
+                            size={14}
+                            color={AntigravityPalette.coralRed}
+                          />
+                          <Text style={styles.deletePillText}>Remover</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={styles.confirmBox}>
+                        <Text style={styles.confirmTitle}>
+                          Confirmar remoção deste comprovante do histórico?
                         </Text>
-                      </TouchableOpacity>
+                        <View style={styles.centeredButtonsRow}>
+                          <TouchableOpacity
+                            style={styles.confirmDeleteBtn}
+                            onPress={confirmarExclusao}
+                          >
+                            <Feather
+                              name="trash-2"
+                              size={14}
+                              color={AntigravityPalette.canvas}
+                            />
+                            <Text style={styles.confirmDeleteText}>
+                              Confirmar exclusão
+                            </Text>
+                          </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={styles.editPillBtn}
-                        onPress={() => setModoEdicao(true)}
-                      >
-                        <Feather
-                          name="edit-3"
-                          size={14}
-                          color={AntigravityPalette.cobaltBlue}
-                        />
-                        <Text style={styles.editPillText}>Editar dados</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.deletePillBtn}
-                        onPress={excluirRegistro}
-                      >
-                        <Feather
-                          name="trash-2"
-                          size={14}
-                          color={AntigravityPalette.coralRed}
-                        />
-                        <Text style={styles.deletePillText}>Remover</Text>
-                      </TouchableOpacity>
-                    </View>
+                          <TouchableOpacity
+                            style={styles.cancelPillBtn}
+                            onPress={() => setConfirmandoExclusao(false)}
+                          >
+                            <Text style={styles.cancelPillText}>Manter</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -379,7 +476,7 @@ export default function DetalhesScreen() {
             <View style={styles.backRow}>
               <TouchableOpacity
                 style={styles.backPillBtn}
-                onPress={() => router.back()}
+                onPress={voltarParaHistorico}
               >
                 <Feather
                   name="arrow-left"
@@ -418,6 +515,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 14,
   },
   codeBadge: {
@@ -430,6 +528,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: AntigravityPalette.cobaltBlue,
     fontWeight: '600',
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radii.pill,
+  },
+  syncBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: AntigravityPalette.blueTint,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  feedbackBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    color: AntigravityPalette.obsidian,
   },
   infoArea: {
     gap: 10,
@@ -623,6 +749,33 @@ const styles = StyleSheet.create({
   },
   deletePillText: {
     color: AntigravityPalette.coralRed,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  confirmBox: {
+    backgroundColor: AntigravityPalette.coralTint,
+    padding: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  confirmTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AntigravityPalette.obsidian,
+    textAlign: 'center',
+  },
+  confirmDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: AntigravityPalette.coralRed,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: Radii.pill,
+  },
+  confirmDeleteText: {
+    color: AntigravityPalette.canvas,
     fontWeight: '600',
     fontSize: 13,
   },

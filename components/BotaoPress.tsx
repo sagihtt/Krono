@@ -1,6 +1,8 @@
 import { AntigravityPalette, Radii } from "@/constants/theme";
 import React, { useEffect, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text } from "react-native";
+
+const USE_NATIVE_DRIVER = Platform.OS !== "web";
 
 export interface BotaoPressProps {
   titulo: string;
@@ -24,7 +26,7 @@ export const BotaoPress: React.FC<BotaoPressProps> = ({
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
       toValue: 0.96,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
       speed: 200,
       bounciness: 16,
     }).start();
@@ -33,7 +35,7 @@ export const BotaoPress: React.FC<BotaoPressProps> = ({
   const handlePressOut = () => {
     Animated.spring(scaleValue, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
       speed: 200,
       bounciness: 16,
     }).start();

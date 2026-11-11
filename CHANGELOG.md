@@ -6,6 +6,25 @@ O formato segue o padrão [Keep a Changelog](https://keepachangelog.com/pt-BR/1.
 
 ---
 
+## [2.3.0] - 2026-11-11 (API Online em Produção, Otimização de Registro, Identidade Visual Escura e Bateria de Testes)
+
+### Adicionado
+- **Servidor Online em Produção (`https://krono.engine.lat/api` e `api/server.js`)**: Implantação da API Node.js + Express containerizada em Docker com persistência atômica em disco (`data/db.json`), gravação física de arquivos enviados via `multipart/form-data` (`POST /upload` e `/uploads/*`), rota `GET /health` e isolamento de histórico por aparelho através do cabeçalho `X-Krono-Client-Id`.
+- **Aplicação Web Publicada (`https://krono.engine.lat`)**: Exportação estática do Expo Router servida sob o mesmo subdomínio com proxy reverso Nginx (`api/nginx/krono.engine.lat.conf`).
+- **Logotipo Oficial e Ícones Adaptativos com Fundo Escuro (`assets/images/logo-krono.svg`, `components/KronoLogo.tsx` e `app.json`)**: Monograma geométrico `K` sobre fundo `Obsidian Ink (#121317)` cercado pelo anel cromático de quatro arcos (`#3186FF`, `#00B95C`, `#FBBC04` e `#FC413D`), aplicado nos ícones do sistema, tela de abertura, favicon e cabeçalho do aplicativo.
+- **Pré-seleção Automática da Próxima Categoria (`utils/jornada.ts` e `app/(tabs)/index.tsx`)**: Avanço automático da categoria sugerida conforme a sequência operacional do dia (`Entrada Regular`, `Intervalo`, `Retorno`, `Saída Regular` e `Hora Extra`), mantendo a liberdade de troca manual.
+- **Suíte Automatizada de Testes (`__tests__/krono.test.mjs` e `api/__tests__/server.test.js`)**: Testes unitários e de integração validando máscaras de entrada, progressão de jornada, auditoria de interface, isolamento por cliente, persistência em disco e upload binário.
+
+### Alterado
+- **Registro Instantâneo de Ponto (`components/RelogioDigital.tsx`, `app/(tabs)/index.tsx` e `services/apiService.ts`)**: Isolamento do relógio de 1 segundo em componente dedicado para eliminar re-renderizações da tela principal, reutilização de cache recente de GPS, captura rápida com `skipProcessing: true`, atualização otimista da lista antes do retorno de rede e controle de tempo limite (`AbortController`) em todas as chamadas HTTP.
+- **Sincronização de Pendências Offline (`app/(tabs)/index.tsx` e `app/(tabs)/explore.tsx`)**: Envio automático de batidas gravadas sem internet antes de atualizar a lista remota e sincronização de anexos PDF com a API via `PUT /pontos/:id`.
+
+### Corrigido
+- **Cabeçalho Duplicado e Privacidade no Comprovante (`app/_layout.tsx` e `app/detalhes/[id].tsx`)**: Remoção da barra nativa redundante na tela de detalhes, confirmação inline de exclusão compatível com Web e Android e substituição de coordenadas brutas por link direto do Google Maps no texto compartilhado.
+- **Exclusão Total e Máscaras de Formulário (`services/storageService.ts` e `utils/masks.ts`)**: Preservação da lista vazia quando todos os registros são removidos (sem recriar dados iniciais) e truncamento prévio de dígitos excedentes nas máscaras de CPF e data.
+
+---
+
 ## [2.2.3] - 2026-11-06 (Configuração do EAS Build e Pacote Android)
 
 ### Adicionado

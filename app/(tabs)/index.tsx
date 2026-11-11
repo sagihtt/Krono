@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { BotaoPress } from '@/components/BotaoPress';
 import { RegistroCard } from '@/components/RegistroCard';
+import { RelogioDigital } from '@/components/RelogioDigital';
 import { PONTOS_INICIAIS } from '@/constants/pontosMock';
 import { AntigravityPalette, Radii } from '@/constants/theme';
 import { PontoRegistro } from '@/models/ponto';
@@ -8,14 +9,22 @@ import {
   consultarStatusApi,
   criarPontoApi,
   DEFAULT_API_BASE_URL,
+  enviarArquivoFormDataApi,
   listarPontosApi,
 } from '@/services/apiService';
 import {
   carregarPontosStorage,
   carregarPreferenciasStorage,
+  carregarTurnoFavoritoStorage,
+  PREFERENCIAS_PADRAO,
   salvarPontosStorage,
   salvarPreferenciasStorage,
 } from '@/services/storageService';
+import {
+  CATEGORIAS_JORNADA,
+  formatarLinkMapa,
+  sugerirProximaCategoria,
+} from '@/utils/jornada';
 import Feather from '@expo/vector-icons/Feather';
 import dayjs from 'dayjs';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -29,6 +38,7 @@ import {
   FlatList,
   Image,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -39,37 +49,35 @@ import {
   View,
 } from 'react-native';
 
-const CATEGORIAS_JORNADA = [
-  'Entrada Regular',
-  'Intervalo',
-  'Retorno',
-  'Saída Regular',
-  'Hora Extra',
-];
+const GPS_CACHE_MAX_AGE_MS = 120_000;
+const GPS_FAST_TIMEOUT_MS = 2200;
+const GEOCODE_FAST_TIMEOUT_MS = 1800;
+const CAMERA_FAST_TIMEOUT_MS = 2000;
+
+function comLimiteTempo<T>(promessa: Promise<T>, limiteMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Tempo esgotado')),
+      limiteMs
+    );
+    promessa.then(
+      (valor) => {
+        clearTimeout(timer);
+        resolve(valor);
+      },
+      (erro) => {
+        clearTimeout(timer);
+        reject(erro);
+      }
+    );
+  });
+}
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   const router = useRouter();
 
-  // Relógio em tempo real
-  const [horarioAtual, setHorarioAtual] = useState(() =>
-    dayjs().format('HH:mm:ss')
-  );
-  const [dataAtual, setDataAtual] = useState(() =>
-    dayjs().format('DD/MM/YYYY')
-  );
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const agora = dayjs();
-      setHorarioAtual(agora.format('HH:mm:ss'));
-      setDataAtual(agora.format('DD/MM/YYYY'));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Câmera sempre pronta para capturar no ato do registro de ponto
   const [permissaoCamera, pedirPermissaoCamera] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
   const [cameraExpandida, setCameraExpandida] = useState<boolean>(true);
@@ -77,11 +85,12 @@ export default function HomeScreen() {
   const [registrando, setRegistrando] = useState<boolean>(false);
   const cameraRef = useRef<CameraView>(null);
 
-  // Geolocalização e endereço aproximado (Reverse Geocoding)
   const [localizacaoAtual, setLocalizacaoAtual] =
     useState<Location.LocationObject | null>(null);
+  const ultimaLeituraGpsMsRef = useRef<number>(0);
+
   const [enderecoPrincipal, setEnderecoPrincipal] = useState<string>(
-    'SGAN 601, Módulo B — Sede Principal'
+    'SGAN 601, Módulo B - Sede Principal'
   );
   const [enderecoSecundario, setEnderecoSecundario] = useState<string>(
     'Asa Norte • Brasília - DF'
@@ -89,36 +98,59 @@ export default function HomeScreen() {
   const [erroLocalizacao, setErroLocalizacao] = useState<string | null>(null);
   const [buscandoGps, setBuscandoGps] = useState<boolean>(false);
 
-  // Lista de registros e preferências
   const [pontos, setPontos] = useState<PontoRegistro[]>(PONTOS_INICIAIS);
   const [modoCompacto, setModoCompacto] = useState<boolean>(false);
+  const [turnoAtivo, setTurnoAtivo] = useState<string>(
+    PREFERENCIAS_PADRAO.turnoFavorito
+  );
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE_URL);
   const [apiOnline, setApiOnline] = useState<boolean>(false);
 
-  // Formulário de novo registro
-  const [categoriaSelecionada, setCategoriaSelecionada] =
-    useState<string>('Entrada Regular');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>(() =>
+    sugerirProximaCategoria(PONTOS_INICIAIS)
+  );
   const [observacaoInput, setObservacaoInput] = useState<string>('');
+  const [feedbackRegistro, setFeedbackRegistro] = useState<string | null>(null);
 
   const sincronizarDados = useCallback(async () => {
     try {
-      const prefs = await carregarPreferenciasStorage();
+      const [prefs, turnoSalvo, pontosLocais] = await Promise.all([
+        carregarPreferenciasStorage(),
+        carregarTurnoFavoritoStorage(),
+        carregarPontosStorage(),
+      ]);
+
       setModoCompacto(prefs.modoCompacto);
+      setTurnoAtivo(
+        turnoSalvo || prefs.turnoFavorito || PREFERENCIAS_PADRAO.turnoFavorito
+      );
       const urlAtiva = prefs.apiUrl || DEFAULT_API_BASE_URL;
       setApiUrl(urlAtiva);
-
-      const pontosLocais = await carregarPontosStorage();
       setPontos(pontosLocais);
+      setCategoriaSelecionada(sugerirProximaCategoria(pontosLocais));
 
       try {
-        const [, pontosRemotos] = await Promise.all([
-          consultarStatusApi(urlAtiva),
-          listarPontosApi(urlAtiva),
-        ]);
+        await consultarStatusApi(urlAtiva);
         setApiOnline(true);
 
-        if (Array.isArray(pontosRemotos) && pontosRemotos.length > 0) {
+        // Envia registros criados offline antes de atualizar a lista remota
+        const pendentes = pontosLocais.filter(
+          (item) => item.sincronizadoApi === false
+        );
+        if (pendentes.length > 0) {
+          for (const itemPendente of [...pendentes].reverse()) {
+            try {
+              await criarPontoApi(itemPendente, urlAtiva);
+            } catch {
+              // Mantem pendencia caso falhe pontualmente
+            }
+          }
+        }
+
+        const pontosRemotos = await listarPontosApi(urlAtiva);
+        if (Array.isArray(pontosRemotos)) {
           setPontos(pontosRemotos);
+          setCategoriaSelecionada(sugerirProximaCategoria(pontosRemotos));
           await salvarPontosStorage(pontosRemotos);
         }
       } catch {
@@ -135,79 +167,55 @@ export default function HomeScreen() {
     }, [sincronizarDados])
   );
 
-  const tirarFotoComprovante = async (): Promise<string | null> => {
-    let cameraLiberada = Boolean(permissaoCamera?.granted);
-    if (!cameraLiberada) {
-      const resp = await pedirPermissaoCamera();
-      cameraLiberada = resp.granted;
-      if (!cameraLiberada) {
-        Alert.alert(
-          'Acesso à câmera',
-          'Ative a permissão da câmera para anexar a foto do comprovante.'
-        );
-        return null;
-      }
-    }
-
-    if (!cameraExpandida) {
-      setCameraExpandida(true);
-      await new Promise((resolve) => setTimeout(resolve, 350));
-    }
-
-    if (cameraRef.current) {
-      try {
-        const foto = await cameraRef.current.takePictureAsync({
-          quality: 0.75,
-        });
-        if (foto?.uri) {
-          setFotoUri(foto.uri);
-          return foto.uri;
-        }
-      } catch {
-        // Em emulador ou web sem webcam ativa, retorna null sem travar o fluxo
-      }
-    }
-    return null;
-  };
-
   const resolverEnderecoAproximado = useCallback(
     async (
       latitude: number,
       longitude: number
     ): Promise<{ linha1: string; linha2: string; completo: string }> => {
-      try {
-        const resultados = await Location.reverseGeocodeAsync({
-          latitude,
-          longitude,
-        });
-        if (resultados && resultados.length > 0) {
-          const item = resultados[0];
-          const rua = [item.street, item.streetNumber]
-            .filter(Boolean)
-            .join(', ');
-          const linha1 =
-            rua || item.name || item.district || 'Endereço localizado';
-          const regiao = [
-            item.district || item.subregion,
-            item.city,
-            item.region,
-          ]
-            .filter(Boolean)
-            .join(' • ');
-          const linha2 = regiao || 'Localização confirmada pelo aparelho';
-          return {
-            linha1,
-            linha2,
-            completo: regiao ? `${linha1} — ${regiao}` : linha1,
-          };
+      if (Platform.OS !== 'web') {
+        try {
+          const resultados = await comLimiteTempo(
+            Location.reverseGeocodeAsync({ latitude, longitude }),
+            GEOCODE_FAST_TIMEOUT_MS
+          );
+          if (resultados && resultados.length > 0) {
+            const item = resultados[0];
+            const rua = [item.street, item.streetNumber]
+              .filter(Boolean)
+              .join(', ');
+            const linha1 =
+              rua || item.name || item.district || 'Endereço localizado';
+            const regiao = [
+              item.district || item.subregion,
+              item.city,
+              item.region,
+            ]
+              .filter(Boolean)
+              .join(' • ');
+            const linha2 = regiao || 'Localização confirmada pelo aparelho';
+            return {
+              linha1,
+              linha2,
+              completo: regiao ? `${linha1} - ${regiao}` : linha1,
+            };
+          }
+        } catch {
+          // Segue para consulta Nominatim com timeout curto
         }
-      } catch {
-        // Fallback para OpenStreetMap Nominatim (útil em navegadores Web)
       }
 
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), GEOCODE_FAST_TIMEOUT_MS);
       try {
         const resp = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=pt-BR`
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=pt-BR`,
+          {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'KronoApp/2.3',
+            },
+            signal: controller.signal,
+          }
         );
         if (resp.ok) {
           const data = await resp.json();
@@ -228,17 +236,19 @@ export default function HomeScreen() {
           return {
             linha1,
             linha2,
-            completo: regiao ? `${linha1} — ${regiao}` : linha1,
+            completo: regiao ? `${linha1} - ${regiao}` : linha1,
           };
         }
       } catch {
-        // Segue com endereço padrão da unidade
+        // Segue com endereco padrao da unidade
+      } finally {
+        clearTimeout(timer);
       }
 
       return {
-        linha1: 'Unidade Corporativa — Presencial',
+        linha1: 'Unidade Corporativa - Presencial',
         linha2: 'Localização confirmada no dispositivo',
-        completo: 'Unidade Corporativa — Presencial',
+        completo: 'Unidade Corporativa - Presencial',
       };
     },
     []
@@ -258,14 +268,18 @@ export default function HomeScreen() {
         );
         return {
           posicao: null,
-          enderecoCompleto: `${enderecoPrincipal} — ${enderecoSecundario}`,
+          enderecoCompleto: `${enderecoPrincipal} - ${enderecoSecundario}`,
         };
       }
 
-      const posicao = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const posicao = await comLimiteTempo(
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        4000
+      );
       setLocalizacaoAtual(posicao);
+      ultimaLeituraGpsMsRef.current = Date.now();
 
       const end = await resolverEnderecoAproximado(
         posicao.coords.latitude,
@@ -281,14 +295,14 @@ export default function HomeScreen() {
       );
       return {
         posicao: null,
-        enderecoCompleto: `${enderecoPrincipal} — ${enderecoSecundario}`,
+        enderecoCompleto: `${enderecoPrincipal} - ${enderecoSecundario}`,
       };
     } finally {
       setBuscandoGps(false);
     }
   }, [enderecoPrincipal, enderecoSecundario, resolverEnderecoAproximado]);
 
-  // Busca silenciosamente o endereço aproximado ao abrir se a permissão já estiver concedida
+  // Aquece silenciosamente a localizacao ao abrir caso a permissao ja esteja ativa
   useEffect(() => {
     Location.getForegroundPermissionsAsync()
       .then((perm) => {
@@ -299,97 +313,260 @@ export default function HomeScreen() {
       .catch(() => {});
   }, [obterGpsAtual]);
 
+  const obterLocalizacaoRapidaNoClique = useCallback(async (): Promise<{
+    latitude: number;
+    longitude: number;
+    endereco: string;
+  }> => {
+    const enderecoCache = `${enderecoPrincipal} - ${enderecoSecundario}`;
+    const idadeCache = Date.now() - ultimaLeituraGpsMsRef.current;
+
+    if (localizacaoAtual && idadeCache < GPS_CACHE_MAX_AGE_MS) {
+      return {
+        latitude: localizacaoAtual.coords.latitude,
+        longitude: localizacaoAtual.coords.longitude,
+        endereco: enderecoCache,
+      };
+    }
+
+    try {
+      const perm = await Location.getForegroundPermissionsAsync();
+      let concedida = perm.granted;
+      if (!concedida && Platform.OS !== 'web') {
+        const pedido = await Location.requestForegroundPermissionsAsync();
+        concedida = pedido.granted;
+      }
+
+      if (!concedida) {
+        return {
+          latitude: localizacaoAtual?.coords.latitude ?? -15.7588,
+          longitude: localizacaoAtual?.coords.longitude ?? -47.8832,
+          endereco: enderecoCache,
+        };
+      }
+
+      let pos = await Location.getLastKnownPositionAsync().catch(() => null);
+      if (!pos) {
+        pos = await comLimiteTempo(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          GPS_FAST_TIMEOUT_MS
+        ).catch(() => null);
+      }
+
+      if (pos) {
+        setLocalizacaoAtual(pos);
+        ultimaLeituraGpsMsRef.current = Date.now();
+
+        // Atualiza o endereco reverso em segundo plano para nao segurar a marcacao
+        resolverEnderecoAproximado(pos.coords.latitude, pos.coords.longitude)
+          .then((end) => {
+            setEnderecoPrincipal(end.linha1);
+            setEnderecoSecundario(end.linha2);
+          })
+          .catch(() => {});
+
+        return {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          endereco: enderecoCache,
+        };
+      }
+    } catch {
+      // Segue com coordenadas padrao sem bloquear
+    }
+
+    return {
+      latitude: localizacaoAtual?.coords.latitude ?? -15.7588,
+      longitude: localizacaoAtual?.coords.longitude ?? -47.8832,
+      endereco: enderecoCache,
+    };
+  }, [
+    enderecoPrincipal,
+    enderecoSecundario,
+    localizacaoAtual,
+    resolverEnderecoAproximado,
+  ]);
+
+  const tirarFotoComprovante = async (
+    modoRapido: boolean = false
+  ): Promise<string | null> => {
+    let cameraLiberada = Boolean(permissaoCamera?.granted);
+    if (!cameraLiberada) {
+      if (modoRapido && Platform.OS === 'web') {
+        return null;
+      }
+      const resp = await pedirPermissaoCamera();
+      cameraLiberada = resp.granted;
+      if (!cameraLiberada) {
+        if (!modoRapido) {
+          Alert.alert(
+            'Acesso à câmera',
+            'Ative a permissão da câmera para anexar a foto do comprovante.'
+          );
+        }
+        return null;
+      }
+    }
+
+    if (!cameraExpandida && !modoRapido) {
+      setCameraExpandida(true);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    if (cameraRef.current && cameraExpandida) {
+      try {
+        const foto = await comLimiteTempo(
+          cameraRef.current.takePictureAsync({
+            quality: 0.6,
+            skipProcessing: true,
+          }),
+          CAMERA_FAST_TIMEOUT_MS
+        );
+        if (foto?.uri) {
+          if (!modoRapido) {
+            setFotoUri(foto.uri);
+          }
+          return foto.uri;
+        }
+      } catch {
+        // Sem webcam ativa ou emulador: segue sem travar o fluxo
+      }
+    }
+    return null;
+  };
+
   const abrirNoMapa = () => {
     const lat = localizacaoAtual ? localizacaoAtual.coords.latitude : -15.7588;
     const lon = localizacaoAtual ? localizacaoAtual.coords.longitude : -47.8832;
-    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-    Linking.openURL(url).catch(() => {});
+    Linking.openURL(formatarLinkMapa(lat, lon)).catch(() => {});
   };
 
-  // Fluxo completo ao tocar em Registrar ponto:
-  // 1. Autentica biometria -> 2. Obtém GPS -> 3. Libera câmera e já tira a foto -> 4. Salva registro
   const registrarPonto = async () => {
     if (registrando) return;
     setRegistrando(true);
+    setFeedbackRegistro(null);
 
     try {
-      // 1. Autenticação Biométrica / Identidade
-      try {
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        if (hasHardware && isEnrolled) {
-          const authResult = await LocalAuthentication.authenticateAsync({
-            promptMessage: 'Confirme sua identidade para registrar o ponto',
-          });
-          if (!authResult.success) {
-            Alert.alert(
-              'Verificação necessária',
-              'A confirmação de identidade não foi concluída.'
-            );
-            return;
+      // 1. Verificacao biometrica local (quando disponivel no dispositivo)
+      if (Platform.OS !== 'web') {
+        try {
+          const [hasHardware, isEnrolled] = await Promise.all([
+            LocalAuthentication.hasHardwareAsync(),
+            LocalAuthentication.isEnrolledAsync(),
+          ]);
+          if (hasHardware && isEnrolled) {
+            const authResult = await LocalAuthentication.authenticateAsync({
+              promptMessage: 'Confirme sua identidade para registrar o ponto',
+            });
+            if (!authResult.success) {
+              Alert.alert(
+                'Verificação necessária',
+                'A confirmação de identidade não foi concluída.'
+              );
+              return;
+            }
           }
+        } catch {
+          // Segue em dispositivos sem sensor biometrico
         }
-      } catch {
-        // Segue normalmente em ambientes sem sensor biométrico
       }
 
-      // 2. Geolocalização e Endereço Aproximado
-      const resultadoGps = await obterGpsAtual();
-      const posicaoGps = resultadoGps.posicao ?? localizacaoAtual;
-      const latitude = posicaoGps ? posicaoGps.coords.latitude : -15.7588;
-      const longitude = posicaoGps ? posicaoGps.coords.longitude : -47.8832;
-      const enderecoFormatado =
-        resultadoGps.enderecoCompleto ||
-        `${enderecoPrincipal} — ${enderecoSecundario}`;
+      // 2. Localizacao em cache/rapida e foto otimizada em paralelo
+      const [dadosGps, fotoCapturadaAgora] = await Promise.all([
+        obterLocalizacaoRapidaNoClique(),
+        fotoUri ? Promise.resolve(fotoUri) : tirarFotoComprovante(true),
+      ]);
 
-      // 3. Captura automática da foto na câmera
-      const uriCapturadaAgora = await tirarFotoComprovante();
-      const uriFinalFoto = uriCapturadaAgora ?? fotoUri;
-
-      // 4. Montagem e gravação do registro
+      const uriFinalFoto = fotoCapturadaAgora ?? fotoUri;
       const agora = dayjs();
+      const idTemporario = `temp_${Date.now()}`;
+      const categoriaMarcada = categoriaSelecionada;
       const proximoNumero = pontos.length + 1;
-      const payloadNovoPonto: PontoRegistro = {
-        id: String(Date.now()),
-        titulo: `Registro #${proximoNumero} - ${categoriaSelecionada}`,
-        categoria: categoriaSelecionada,
+
+      const registroOtimista: PontoRegistro = {
+        id: idTemporario,
+        titulo: `Registro #${proximoNumero} - ${categoriaMarcada}`,
+        categoria: categoriaMarcada,
         dataHora: agora.format('DD/MM/YYYY HH:mm:ss'),
-        localizacao: enderecoFormatado,
-        latitude,
-        longitude,
+        localizacao: dadosGps.endereco,
+        latitude: dadosGps.latitude,
+        longitude: dadosGps.longitude,
         observacao:
           observacaoInput.trim() ||
-          'Registro realizado com foto e endereço aproximado.',
+          'Marcação confirmada com localização verificada.',
         fotoUri: uriFinalFoto,
         sincronizadoApi: false,
       };
 
-      let registroSalvo = payloadNovoPonto;
-      try {
-        const criadoNaApi = await criarPontoApi(payloadNovoPonto, apiUrl);
-        registroSalvo = { ...criadoNaApi, sincronizadoApi: true };
-        setApiOnline(true);
-      } catch {
-        setApiOnline(false);
-      }
-
-      const novaLista = [registroSalvo, ...pontos];
-      setPontos(novaLista);
-      await salvarPontosStorage(novaLista);
+      // 3. Atualizacao imediata da tela (Optimistic UI)
+      const listaOtimista = [registroOtimista, ...pontos];
+      setPontos(listaOtimista);
+      setCategoriaSelecionada(sugerirProximaCategoria(listaOtimista));
       setObservacaoInput('');
-
-      Alert.alert(
-        'Ponto registrado',
-        `${categoriaSelecionada} confirmada às ${agora.format('HH:mm')}.`
+      setFotoUri(null);
+      setFeedbackRegistro(
+        `Marcação de ${categoriaMarcada} registrada às ${agora.format('HH:mm:ss')}.`
       );
+      setRegistrando(false);
+
+      await salvarPontosStorage(listaOtimista);
+
+      // 4. Sincronizacao em segundo plano com o servidor Express online
+      (async () => {
+        try {
+          let uriFotoRemota = uriFinalFoto;
+          if (uriFinalFoto && !uriFinalFoto.startsWith('http')) {
+            try {
+              const up = await enviarArquivoFormDataApi(
+                {
+                  uri: uriFinalFoto,
+                  name: `ponto-${Date.now()}.jpg`,
+                  mimeType: 'image/jpeg',
+                },
+                apiUrl
+              );
+              if (up.arquivoUrl) {
+                uriFotoRemota = up.arquivoUrl;
+              }
+            } catch {
+              // Mantem URI local caso o upload da imagem falhe
+            }
+          }
+
+          const criadoNaApi = await criarPontoApi(
+            {
+              ...registroOtimista,
+              fotoUri: uriFotoRemota,
+            },
+            apiUrl
+          );
+
+          const consolidado: PontoRegistro = {
+            ...criadoNaApi,
+            sincronizadoApi: true,
+          };
+
+          setApiOnline(true);
+          setPontos((listaAtual) => {
+            const substituida = listaAtual.map((item) =>
+              item.id === idTemporario ? consolidado : item
+            );
+            salvarPontosStorage(substituida).catch(() => {});
+            return substituida;
+          });
+        } catch {
+          setApiOnline(false);
+        }
+      })();
     } catch {
       Alert.alert('Erro', 'Não foi possível concluir o registro.');
-    } finally {
       setRegistrando(false);
     }
   };
 
-  const alternarModoCompacto = async (valor: boolean) => {
+  const alternarModoCompacto = useCallback(async (valor: boolean) => {
     setModoCompacto(valor);
     try {
       const prefsAtuais = await carregarPreferenciasStorage();
@@ -400,11 +577,15 @@ export default function HomeScreen() {
     } catch {
       // Silencioso
     }
-  };
+  }, []);
 
-  const abrirPrimeiroRegistro = useCallback(() => {
-    router.push('/detalhes/1');
-  }, [router]);
+  const ultimoRegistroId = pontos[0]?.id ? String(pontos[0].id) : null;
+
+  const abrirUltimoRegistro = useCallback(() => {
+    if (ultimoRegistroId) {
+      router.push(`/detalhes/${ultimoRegistroId}`);
+    }
+  }, [router, ultimoRegistroId]);
 
   const handleAbrirDetalhes = useCallback(
     (id: string) => {
@@ -413,27 +594,30 @@ export default function HomeScreen() {
     [router]
   );
 
+  const renderItemHistorico = useCallback(
+    ({ item }: { item: PontoRegistro }) => (
+      <RegistroCard
+        titulo={item.titulo}
+        categoria={item.categoria}
+        dataHora={item.dataHora}
+        localizacao={item.localizacao}
+        temFoto={Boolean(item.fotoUri)}
+        temAnexo={Boolean(item.anexoPdf)}
+        sincronizadoApi={Boolean(item.sincronizadoApi)}
+        modoCompacto={modoCompacto}
+        onPress={() => handleAbrirDetalhes(String(item.id))}
+      />
+    ),
+    [handleAbrirDetalhes, modoCompacto]
+  );
+
   const renderPainelControle = () => (
     <View style={styles.controlColumn}>
-      {/* Card Principal: Relógio e Registro de Ponto */}
       <View style={styles.clockCard}>
-        <View style={styles.clockTopRow}>
-          <View style={styles.dateBadge}>
-            <Feather
-              name="calendar"
-              size={12}
-              color={AntigravityPalette.slate}
-            />
-            <Text style={styles.dateBadgeText}>{dataAtual}</Text>
-          </View>
-          <Text style={styles.shiftHint} numberOfLines={1}>
-            Expediente regular
-          </Text>
-        </View>
+        <RelogioDigital turnoLabel={turnoAtivo} />
 
-        <Text style={styles.clockDigits}>{horarioAtual}</Text>
         <Text style={styles.clockSubtitle}>
-          Selecione o tipo de marcação abaixo
+          Próxima batida sugerida automaticamente
         </Text>
 
         <View style={styles.chipsContainer}>
@@ -490,13 +674,23 @@ export default function HomeScreen() {
               />
             )}
             <Text style={styles.primaryActionBtnText}>
-              {registrando ? 'Autenticando e fotografando...' : 'Registrar ponto'}
+              {registrando ? 'Registrando batida...' : 'Registrar ponto'}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {feedbackRegistro ? (
+          <View style={styles.successBanner}>
+            <Feather
+              name="check"
+              size={14}
+              color={AntigravityPalette.emerald}
+            />
+            <Text style={styles.successBannerText}>{feedbackRegistro}</Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* Card de Localização e Comprovante Fotográfico */}
       <View style={styles.surfaceCard}>
         <View style={styles.cardHeaderRow}>
           <View style={styles.headerIconTitle}>
@@ -567,7 +761,6 @@ export default function HomeScreen() {
 
         <View style={styles.divider} />
 
-        {/* Controle da câmera */}
         <View style={styles.cameraHeaderRow}>
           <Text style={styles.subSectionLabel} numberOfLines={1}>
             Câmera de comprovação
@@ -645,7 +838,7 @@ export default function HomeScreen() {
 
                   <TouchableOpacity
                     style={styles.cameraHalfBtnPrimary}
-                    onPress={tirarFotoComprovante}
+                    onPress={() => tirarFotoComprovante(false)}
                   >
                     <Feather
                       name="camera"
@@ -668,7 +861,7 @@ export default function HomeScreen() {
         {fotoUri && (
           <View style={styles.previewBox}>
             <Text style={styles.previewLabel}>
-              Foto capturada para o comprovante
+              Foto pronta para anexar ao próximo registro
             </Text>
             <Image source={{ uri: fotoUri }} style={styles.previewImage} />
             <View style={styles.previewFooter}>
@@ -698,7 +891,7 @@ export default function HomeScreen() {
             Histórico de marcações
           </Text>
           <Text style={styles.cardSubtitle} numberOfLines={1}>
-            {pontos.length} registros disponíveis
+            {pontos.length} {pontos.length === 1 ? 'registro disponível' : 'registros disponíveis'}
           </Text>
         </View>
 
@@ -716,23 +909,25 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.quickShortcutsRow}>
-        <Link href="/detalhes/1" style={styles.shortcutLink}>
-          <Text style={styles.shortcutLinkText}>Primeiro registro do dia</Text>
-        </Link>
+      {ultimoRegistroId ? (
+        <View style={styles.quickShortcutsRow}>
+          <Link href={`/detalhes/${ultimoRegistroId}`} style={styles.shortcutLink}>
+            <Text style={styles.shortcutLinkText}>Marcação mais recente</Text>
+          </Link>
 
-        <TouchableOpacity
-          style={styles.shortcutButton}
-          onPress={abrirPrimeiroRegistro}
-        >
-          <Text style={styles.shortcutButtonText}>Abrir comprovante</Text>
-          <Feather
-            name="arrow-up-right"
-            size={13}
-            color={AntigravityPalette.cobaltBlue}
-          />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.shortcutButton}
+            onPress={abrirUltimoRegistro}
+          >
+            <Text style={styles.shortcutButtonText}>Abrir comprovante</Text>
+            <Feather
+              name="arrow-up-right"
+              size={13}
+              color={AntigravityPalette.cobaltBlue}
+            />
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -779,19 +974,7 @@ export default function HomeScreen() {
               {renderCabecalhoHistorico()}
             </View>
           }
-          renderItem={({ item }) => (
-            <RegistroCard
-              titulo={item.titulo}
-              categoria={item.categoria}
-              dataHora={item.dataHora}
-              localizacao={item.localizacao}
-              temFoto={Boolean(item.fotoUri)}
-              temAnexo={Boolean(item.anexoPdf)}
-              sincronizadoApi={Boolean(item.sincronizadoApi)}
-              modoCompacto={modoCompacto}
-              onPress={() => handleAbrirDetalhes(String(item.id))}
-            />
-          )}
+          renderItem={renderItemHistorico}
         />
       )}
     </AppShell>
@@ -799,9 +982,15 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  mobileListContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 36,
+  },
   wideScrollContainer: {
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    paddingBottom: 42,
   },
   wideGrid: {
     maxWidth: 1080,
@@ -809,77 +998,31 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 24,
+    gap: 20,
   },
   wideLeftCol: {
-    width: 420,
+    flex: 1,
+    maxWidth: 460,
   },
   wideRightCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  mobileListContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
-    maxWidth: 640,
-    width: '100%',
-    alignSelf: 'center',
+    flex: 1.15,
   },
   controlColumn: {
-    gap: 14,
-    marginBottom: 14,
+    gap: 16,
+    marginBottom: 16,
   },
   clockCard: {
     backgroundColor: AntigravityPalette.surface,
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-  },
-  clockTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: 8,
-  },
-  dateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radii.pill,
-    borderWidth: 1,
-    borderColor: AntigravityPalette.border,
-    flexShrink: 0,
-  },
-  dateBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AntigravityPalette.slate,
-  },
-  shiftHint: {
-    fontSize: 12,
-    color: AntigravityPalette.muted,
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  clockDigits: {
-    fontSize: 36,
-    fontWeight: '600',
-    color: AntigravityPalette.obsidian,
-    letterSpacing: -1,
-    textAlign: 'center',
-    marginTop: 4,
   },
   clockSubtitle: {
     fontSize: 13,
-    color: AntigravityPalette.muted,
+    color: AntigravityPalette.slate,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
     marginBottom: 14,
   },
   chipsContainer: {
@@ -891,7 +1034,7 @@ const styles = StyleSheet.create({
   },
   categoryChip: {
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: Radii.pill,
     borderWidth: 1,
@@ -914,8 +1057,8 @@ const styles = StyleSheet.create({
     backgroundColor: AntigravityPalette.canvas,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: Radii.pill,
+    paddingHorizontal: 16,
     paddingVertical: 11,
     fontSize: 13,
     color: AntigravityPalette.obsidian,
@@ -931,19 +1074,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: AntigravityPalette.obsidian,
-    paddingVertical: 13,
+    paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: Radii.pill,
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 340,
   },
   primaryActionBtnDisabled: {
-    opacity: 0.72,
+    opacity: 0.68,
   },
   primaryActionBtnText: {
     color: AntigravityPalette.canvas,
     fontSize: 14,
     fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: AntigravityPalette.emeraldTint,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: Radii.pill,
+    marginTop: 12,
+  },
+  successBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.emerald,
   },
   surfaceCard: {
     backgroundColor: AntigravityPalette.surface,
@@ -954,19 +1114,15 @@ const styles = StyleSheet.create({
   },
   cardHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    justifyContent: 'space-between',
     gap: 10,
+    marginBottom: 14,
   },
   headerIconTitle: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTextWrap: {
     flex: 1,
     minWidth: 0,
   },
@@ -978,6 +1134,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  headerTextWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   cardTitle: {
     fontSize: 15,
@@ -993,18 +1153,18 @@ const styles = StyleSheet.create({
   ghostPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
     flexShrink: 0,
   },
   ghostPillText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     color: AntigravityPalette.obsidian,
   },
   noticeBanner: {
@@ -1012,22 +1172,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: AntigravityPalette.amberTint,
-    padding: 10,
-    borderRadius: 10,
+    padding: 11,
+    borderRadius: 12,
     marginBottom: 12,
   },
   noticeBannerText: {
     flex: 1,
     fontSize: 12,
     color: '#92400E',
+    lineHeight: 17,
   },
   addressBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
     backgroundColor: AntigravityPalette.canvas,
-    padding: 14,
+    padding: 13,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
@@ -1035,29 +1196,30 @@ const styles = StyleSheet.create({
   addressTextCol: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
   },
   addressLabel: {
     fontSize: 11,
     fontWeight: '600',
     color: AntigravityPalette.muted,
+    marginBottom: 2,
   },
   addressPrimary: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
-    lineHeight: 19,
+    lineHeight: 18,
   },
   addressSecondary: {
     fontSize: 12,
     color: AntigravityPalette.slate,
+    marginTop: 2,
   },
   mapLinkPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     backgroundColor: AntigravityPalette.blueTint,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: Radii.pill,
     flexShrink: 0,
@@ -1070,17 +1232,16 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: AntigravityPalette.border,
-    marginVertical: 14,
+    marginVertical: 15,
   },
   cameraHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
   },
   subSectionLabel: {
     flex: 1,
-    minWidth: 0,
     fontSize: 13,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
@@ -1089,9 +1250,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   permissionBox: {
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 22,
+    backgroundColor: AntigravityPalette.canvas,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: AntigravityPalette.border,
   },
   permissionDeniedBox: {
     backgroundColor: AntigravityPalette.canvas,
@@ -1099,45 +1266,45 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    gap: 6,
+    alignItems: 'center',
+    gap: 8,
   },
   permissionDeniedTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: AntigravityPalette.obsidian,
     textAlign: 'center',
   },
   permissionText: {
-    fontSize: 13,
+    fontSize: 12,
     color: AntigravityPalette.slate,
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 17,
+    marginBottom: 4,
   },
   cameraContainer: {
-    height: 185,
+    height: 210,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: AntigravityPalette.obsidian,
+    backgroundColor: '#000',
   },
   camera: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
   },
   cameraControlsRow: {
-    marginTop: 10,
     flexDirection: 'row',
     gap: 10,
+    marginTop: 10,
   },
   cameraHalfBtnSecondary: {
     flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: AntigravityPalette.canvas,
-    paddingHorizontal: 10,
     paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: Radii.pill,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
@@ -1149,14 +1316,13 @@ const styles = StyleSheet.create({
   },
   cameraHalfBtnPrimary: {
     flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: AntigravityPalette.obsidian,
-    paddingHorizontal: 10,
     paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: Radii.pill,
   },
   cameraHalfBtnPrimaryText: {
@@ -1165,58 +1331,55 @@ const styles = StyleSheet.create({
     color: AntigravityPalette.canvas,
   },
   previewBox: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: 14,
     backgroundColor: AntigravityPalette.canvas,
+    padding: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
-    gap: 8,
   },
   previewLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    color: AntigravityPalette.obsidian,
-    textAlign: 'center',
+    color: AntigravityPalette.muted,
+    marginBottom: 8,
   },
   previewImage: {
     width: '100%',
-    height: 150,
+    height: 156,
     borderRadius: 10,
     backgroundColor: AntigravityPalette.surfaceAlt,
   },
   previewFooter: {
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 10,
   },
   removePhotoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: AntigravityPalette.coralTint,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: Radii.pill,
   },
   removePhotoText: {
-    color: AntigravityPalette.coralRed,
     fontSize: 12,
     fontWeight: '600',
+    color: AntigravityPalette.coralRed,
   },
   historyHeaderCard: {
     backgroundColor: AntigravityPalette.surface,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: AntigravityPalette.border,
     marginBottom: 12,
-    gap: 12,
   },
   historyTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10,
   },
   historyTitleCol: {
@@ -1226,7 +1389,7 @@ const styles = StyleSheet.create({
   compactToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     flexShrink: 0,
   },
   compactToggleLabel: {
@@ -1236,35 +1399,34 @@ const styles = StyleSheet.create({
   },
   quickShortcutsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: AntigravityPalette.border,
   },
   shortcutLink: {
-    backgroundColor: AntigravityPalette.canvas,
-    borderRadius: Radii.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: AntigravityPalette.border,
+    paddingVertical: 4,
   },
   shortcutLinkText: {
-    color: AntigravityPalette.slate,
-    fontWeight: '500',
     fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.slate,
   },
   shortcutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: AntigravityPalette.blueTint,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: Radii.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
   },
   shortcutButtonText: {
-    color: AntigravityPalette.cobaltBlue,
-    fontWeight: '600',
     fontSize: 12,
+    fontWeight: '600',
+    color: AntigravityPalette.cobaltBlue,
   },
 });

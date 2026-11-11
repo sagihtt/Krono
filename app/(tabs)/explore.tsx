@@ -2,6 +2,8 @@ import { AppShell } from '@/components/AppShell';
 import { AntigravityPalette, Radii } from '@/constants/theme';
 import { AnexoDocumento, PontoRegistro } from '@/models/ponto';
 import {
+  atualizarPontoApi,
+  consultarStatusApi,
   DEFAULT_API_BASE_URL,
   enviarArquivoFormDataApi,
 } from '@/services/apiService';
@@ -37,19 +39,15 @@ export default function DocumentosScreen() {
 
   const [pontos, setPontos] = useState<PontoRegistro[]>([]);
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API_BASE_URL);
+  const [apiOnline, setApiOnline] = useState<boolean>(false);
 
-  // Estados de imagem e envio
   const [imagemSelecionada, setImagemSelecionada] = useState<string | null>(
     null
   );
   const [statusUpload, setStatusUpload] = useState<string | null>(null);
-
-  // Estado de anexo PDF
   const [pdfSelecionado, setPdfSelecionado] = useState<AnexoDocumento | null>(
     null
   );
-
-  // Estado do espelho de ponto gerado
   const [conteudoRelatorioTxt, setConteudoRelatorioTxt] = useState<
     string | null
   >(null);
@@ -57,21 +55,32 @@ export default function DocumentosScreen() {
     null
   );
 
+  const carregarContexto = useCallback(async () => {
+    const [lista, prefs] = await Promise.all([
+      carregarPontosStorage(),
+      carregarPreferenciasStorage(),
+    ]);
+    const urlAtiva = prefs.apiUrl || DEFAULT_API_BASE_URL;
+    setPontos(lista);
+    setApiUrl(urlAtiva);
+    if (lista[0]?.anexoPdf) {
+      setPdfSelecionado(lista[0].anexoPdf);
+    }
+
+    try {
+      await consultarStatusApi(urlAtiva);
+      setApiOnline(true);
+    } catch {
+      setApiOnline(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      async function carregarContexto() {
-        const [lista, prefs] = await Promise.all([
-          carregarPontosStorage(),
-          carregarPreferenciasStorage(),
-        ]);
-        setPontos(lista);
-        setApiUrl(prefs.apiUrl || DEFAULT_API_BASE_URL);
-      }
       carregarContexto();
-    }, [])
+    }, [carregarContexto])
   );
 
-  // Compartilhamento de resumo em texto
   const compartilharResumoTexto = async () => {
     try {
       const resumoLinhas = pontos
@@ -80,9 +89,9 @@ export default function DocumentosScreen() {
         .join('\n');
 
       await Share.share({
-        title: 'Espelho de Ponto — Krono',
+        title: 'Espelho de Ponto - Krono',
         message:
-          `Espelho de Ponto — Krono\n` +
+          `Espelho de Ponto - Krono\n` +
           `Total de registros: ${pontos.length}\n\n` +
           `${resumoLinhas}`,
       });
@@ -94,13 +103,11 @@ export default function DocumentosScreen() {
     }
   };
 
-  // Geração e leitura de relatório offline no armazenamento do aplicativo
   const gerarRelatorioOffline = () => {
     try {
       const linhas = pontos
         .map(
-          (p) =>
-            `#${p.id} | ${p.dataHora} | ${p.categoria} | ${p.localizacao}`
+          (p) => `#${p.id} | ${p.dataHora} | ${p.categoria} | ${p.localizacao}`
         )
         .join('\n');
 
@@ -132,7 +139,6 @@ export default function DocumentosScreen() {
     }
   };
 
-  // Compartilhamento de arquivo físico (PDF, TXT ou Foto)
   const compartilharArquivo = async (uriAlvo?: string | null) => {
     const uriParaEnviar =
       uriAlvo || uriRelatorioGerado || pdfSelecionado?.uri || imagemSelecionada;
@@ -161,7 +167,6 @@ export default function DocumentosScreen() {
     }
   };
 
-  // Seleção de imagem da galeria com recorte e compressão
   const escolherImagemDaGaleria = async () => {
     try {
       const resultado = await ImagePicker.launchImageLibraryAsync({
@@ -193,15 +198,18 @@ export default function DocumentosScreen() {
         },
         apiUrl
       );
-      setStatusUpload(`Comprovante recebido às ${resp.recebidoEm}`);
+      setApiOnline(true);
+      setStatusUpload(
+        `Comprovante sincronizado às ${new Date(resp.recebidoEm).toLocaleTimeString('pt-BR')}`
+      );
     } catch {
+      setApiOnline(false);
       setStatusUpload(
         'Comprovante preparado no dispositivo. O envio será concluído quando o servidor estiver conectado.'
       );
     }
   };
 
-  // Salvar foto no álbum do aparelho com permissão apenas de escrita
   const salvarFotoNoAlbum = async () => {
     const uriFoto =
       imagemSelecionada || pontos.find((p) => Boolean(p.fotoUri))?.fotoUri;
@@ -242,7 +250,6 @@ export default function DocumentosScreen() {
     }
   };
 
-  // Seleção de atestado ou justificativa em PDF
   const selecionarDocumentoPdf = async () => {
     try {
       const resultado = await DocumentPicker.getDocumentAsync({
@@ -255,8 +262,27 @@ export default function DocumentosScreen() {
       }
 
       const arquivo = resultado.assets[0];
+      let uriFinal = arquivo.uri;
+
+      try {
+        const uploadResp = await enviarArquivoFormDataApi(
+          {
+            uri: arquivo.uri,
+            name: arquivo.name,
+            mimeType: arquivo.mimeType ?? 'application/pdf',
+          },
+          apiUrl
+        );
+        if (uploadResp.arquivoUrl) {
+          uriFinal = uploadResp.arquivoUrl;
+        }
+        setApiOnline(true);
+      } catch {
+        setApiOnline(false);
+      }
+
       const novoAnexo: AnexoDocumento = {
-        uri: arquivo.uri,
+        uri: uriFinal,
         nome: arquivo.name,
         tamanho: arquivo.size,
         mimeType: arquivo.mimeType ?? 'application/pdf',
@@ -265,11 +291,27 @@ export default function DocumentosScreen() {
       setPdfSelecionado(novoAnexo);
 
       if (pontos.length > 0) {
+        let sincronizado = false;
         const pontoMaisRecente: PontoRegistro = {
           ...pontos[0],
           anexoPdf: novoAnexo,
         };
-        const listaAtualizada = await atualizarPontoNoStorage(pontoMaisRecente);
+
+        try {
+          await atualizarPontoApi(
+            String(pontoMaisRecente.id),
+            pontoMaisRecente,
+            apiUrl
+          );
+          sincronizado = true;
+        } catch {
+          sincronizado = false;
+        }
+
+        const listaAtualizada = await atualizarPontoNoStorage({
+          ...pontoMaisRecente,
+          sincronizadoApi: sincronizado,
+        });
         setPontos(listaAtualizada);
       }
 
@@ -286,12 +328,12 @@ export default function DocumentosScreen() {
     <AppShell
       title="Documentos e anexos"
       subtitle="Atestados, comprovantes fotográficos e espelho de ponto"
+      onlineStatus={apiOnline}
+      onRefresh={carregarContexto}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={[styles.gridContainer, isWide && styles.gridContainerWide]}>
-          {/* Coluna 1: Atestados PDF e Comprovantes Fotográficos */}
           <View style={[styles.column, isWide && styles.columnHalf]}>
-            {/* Card: Atestados e Justificativas (PDF) */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconCircle}>
@@ -360,7 +402,6 @@ export default function DocumentosScreen() {
               ) : null}
             </View>
 
-            {/* Card: Comprovantes Fotográficos */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconCircle}>
@@ -440,9 +481,7 @@ export default function DocumentosScreen() {
             </View>
           </View>
 
-          {/* Coluna 2: Espelho de Ponto e Exportação */}
           <View style={[styles.column, isWide && styles.columnHalf]}>
-            {/* Card: Relatório de Conferência */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconCircle}>
@@ -489,7 +528,6 @@ export default function DocumentosScreen() {
               ) : null}
             </View>
 
-            {/* Card: Compartilhamento e Exportação */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconCircle}>
