@@ -54,6 +54,12 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
       /X-Krono-Client-Id/i
     );
 
+    const rootResp = await fetch(`${baseUrl}/`);
+    assert.equal(rootResp.status, 200);
+    const rootJson = await rootResp.json();
+    assert.equal(rootJson.status, 'online');
+    assert.ok(rootJson.rotas.pontos.endsWith('/pontos'));
+
     const healthResp = await fetch(`${baseUrl}/health`);
     assert.equal(healthResp.status, 200);
     const health = await healthResp.json();

@@ -289,6 +289,23 @@ function createApp(options = {}) {
 
   app.use(express.json({ limit: '5mb' }));
 
+  // Rota raiz da API (exibida ao acessar https://krono.engine.lat/api no navegador)
+  app.get('/', (req, res) => {
+    const base = obterPublicBaseUrl(req);
+    res.status(200).json({
+      status: 'online',
+      servico: 'Krono Express API',
+      versao: '2.3.0',
+      rotas: {
+        health: `${base}/health`,
+        clima: `${base}/clima`,
+        pontos: `${base}/pontos`,
+        upload: `${base}/upload`,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // Healthcheck de producao e Docker
   app.get('/health', (req, res) => {
     res.status(200).json({
