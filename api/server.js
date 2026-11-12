@@ -106,7 +106,7 @@ function extrairPrimeiroArquivoMultipart(buffer, contentTypeHeader) {
       buffer[startPart] === 0x2d &&
       buffer[startPart + 1] === 0x2d
     ) {
-      break;
+      break; // "--" marca o fim do multipart
     }
 
     const contentStart =
@@ -123,6 +123,7 @@ function extrairPrimeiroArquivoMultipart(buffer, contentTypeHeader) {
       const filenameMatch = /filename="([^"]*)"/i.exec(rawHeaders);
       if (filenameMatch && filenameMatch[1]) {
         const mimeMatch = /Content-Type:\s*([^\r\n;]+)/i.exec(rawHeaders);
+        // desconta o \r\n que antecede o proximo boundary
         let bodyEnd = nextBoundary;
         if (
           bodyEnd >= 2 &&
@@ -244,6 +245,7 @@ function createApp(options = {}) {
 
   app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }));
 
+  // registrado antes do express.json() para preservar o buffer binario do multipart
   app.post(
     '/upload',
     express.raw({ type: () => true, limit: '12mb' }),
@@ -437,6 +439,7 @@ function createApp(options = {}) {
     res.status(204).send();
   });
 
+  // mantido por compatibilidade com labs anteriores
   app.get('/filmes', (req, res) => {
     res.json(db.filmes.lista);
   });

@@ -137,6 +137,7 @@ export default function HomeScreen() {
           (item) => item.sincronizadoApi === false
         );
         if (pendentes.length > 0) {
+          // envia do mais antigo ao mais recente antes de puxar a lista consolidada
           for (const itemPendente of [...pendentes].reverse()) {
             try {
               await criarPontoApi(itemPendente, urlAtiva);
@@ -199,6 +200,7 @@ export default function HomeScreen() {
         } catch {}
       }
 
+      // fallback via Nominatim na web ou se o geocoder nativo expirar
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), GEOCODE_FAST_TIMEOUT_MS);
       try {
@@ -352,6 +354,7 @@ export default function HomeScreen() {
         setLocalizacaoAtual(pos);
         ultimaLeituraGpsMsRef.current = Date.now();
 
+        // atualiza o endereço em background para não atrasar o clique
         resolverEnderecoAproximado(pos.coords.latitude, pos.coords.longitude)
           .then((end) => {
             setEnderecoPrincipal(end.linha1);
@@ -496,6 +499,7 @@ export default function HomeScreen() {
 
       await salvarPontosStorage(listaOtimista);
 
+      // sobe foto e batida em background e substitui o id temporário quando confirmar
       (async () => {
         try {
           let uriFotoRemota = uriFinalFoto;

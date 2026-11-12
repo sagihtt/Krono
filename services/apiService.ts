@@ -172,6 +172,7 @@ export async function enviarArquivoFormDataApi(
     const blob = await respLocal.blob();
     formData.append('arquivo', blob, arquivo.name);
   } else {
+    // React Native exige objeto { uri, name, type } em vez de Blob no FormData
     formData.append('arquivo', {
       uri: arquivo.uri,
       name: arquivo.name,

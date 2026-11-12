@@ -115,7 +115,7 @@ describe('Krono App v2.3.0 — Utilitarios, Regras de Negocio e Auditoria AGENTS
 
     for (const arq of arquivosUi) {
       const rel = path.relative(ROOT, arq);
-      if (rel === 'components/hello-wave.tsx') continue;
+      if (rel === 'components/hello-wave.tsx') continue; // ignora componente do template padrao
       const conteudo = fs.readFileSync(arq, 'utf8');
       assert.equal(
         regexEmoji.test(conteudo),

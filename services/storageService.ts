@@ -141,6 +141,7 @@ export async function carregarPreferenciasStorage(): Promise<PreferenciasApp> {
   try {
     const lido = JSON.parse(texto) as Partial<PreferenciasApp>;
     const urlSalva = lido.apiUrl?.trim();
+    // migra valores legados gravados em versões anteriores do app
     const urlFinal =
       !urlSalva || urlSalva === 'http://localhost:3000'
         ? DEFAULT_API_URL_FALLBACK
