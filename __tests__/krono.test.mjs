@@ -110,13 +110,12 @@ describe('Krono App v2.3.0 — Utilitarios, Regras de Negocio e Auditoria AGENTS
       ...listarArquivosRecursivo(path.join(ROOT, 'components'), ['.ts', '.tsx']),
     ];
 
-    // Detecta pictogramas/emojis Unicode (excluindo simbolos tipograficos comuns como •)
     const regexEmoji = /\p{Extended_Pictographic}/u;
     const regexAulasProibidas = /\bAula\s*\d+\b/i;
 
     for (const arq of arquivosUi) {
       const rel = path.relative(ROOT, arq);
-      if (rel === 'components/hello-wave.tsx') continue; // arquivo de template nao usado pelas abas
+      if (rel === 'components/hello-wave.tsx') continue;
       const conteudo = fs.readFileSync(arq, 'utf8');
       assert.equal(
         regexEmoji.test(conteudo),
@@ -130,7 +129,6 @@ describe('Krono App v2.3.0 — Utilitarios, Regras de Negocio e Auditoria AGENTS
       );
     }
 
-    // Verifica zero emojis tambem na documentacao Markdown (AGENTS.md)
     for (const docRel of ['README.md', 'CHANGELOG.md', 'api/README.md']) {
       const docConteudo = fs.readFileSync(path.join(ROOT, docRel), 'utf8');
       assert.equal(
@@ -140,7 +138,6 @@ describe('Krono App v2.3.0 — Utilitarios, Regras de Negocio e Auditoria AGENTS
       );
     }
 
-    // Verifica que detalhes/[id].tsx nao expoe latitude/longitude brutas no compartilhamento
     const detalhesCodigo = fs.readFileSync(
       path.join(ROOT, 'app/detalhes/[id].tsx'),
       'utf8'

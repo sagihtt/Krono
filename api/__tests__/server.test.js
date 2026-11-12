@@ -83,13 +83,11 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
       'X-Krono-Client-Id': 'device_colaborador_B',
     };
 
-    // Cliente A inicia com 5 registros demonstrativos
     const inicialAResp = await fetch(`${baseUrl}/pontos`, { headers: headersA });
     assert.equal(inicialAResp.status, 200);
     const inicialA = await inicialAResp.json();
     assert.equal(inicialA.length, 5);
 
-    // Validacao 400 quando faltam campos obrigatorios
     const invalidoResp = await fetch(`${baseUrl}/pontos`, {
       method: 'POST',
       headers: headersA,
@@ -97,7 +95,6 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
     });
     assert.equal(invalidoResp.status, 400);
 
-    // Criacao no Cliente A (201)
     const criarResp = await fetch(`${baseUrl}/pontos`, {
       method: 'POST',
       headers: headersA,
@@ -116,12 +113,10 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
     assert.equal(criado.sincronizadoApi, true);
     assert.equal(criado.categoria, 'Entrada Regular');
 
-    // Cliente B permanece isolado com 5 registros (nao ve o 6o do Cliente A)
     const listaBResp = await fetch(`${baseUrl}/pontos`, { headers: headersB });
     const listaB = await listaBResp.json();
     assert.equal(listaB.length, 5);
 
-    // Atualizacao PUT no Cliente A com anexoPdf
     const putResp = await fetch(`${baseUrl}/pontos/${criado.id}`, {
       method: 'PUT',
       headers: headersA,
@@ -142,7 +137,6 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
     assert.equal(atualizado.titulo, 'Registro #6 - Entrada Ajustada');
     assert.equal(atualizado.anexoPdf.nome, 'atestado.pdf');
 
-    // Consulta individual por ID
     const getIdResp = await fetch(`${baseUrl}/pontos/${criado.id}`, {
       headers: headersA,
     });
@@ -150,7 +144,6 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
     const lidoPorId = await getIdResp.json();
     assert.equal(lidoPorId.anexoPdf.nome, 'atestado.pdf');
 
-    // ID inexistente retorna 404
     const naoExisteResp = await fetch(`${baseUrl}/pontos/99999`, {
       headers: headersA,
     });
@@ -175,12 +168,10 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
       assert.equal(delResp.status, 204);
     }
 
-    // Lista agora deve permanecer vazia []
     const vaziaResp = await fetch(`${baseUrl}/pontos`, { headers: headersC });
     const vazia = await vaziaResp.json();
     assert.deepEqual(vazia, []);
 
-    // Simula reinicio completo da instancia lendo o mesmo diretorio em disco
     const appReiniciado = createApp({ dataDir: tempDir });
     const server2 = await new Promise((resolve) => {
       const s = appReiniciado.listen(0, '127.0.0.1', () => resolve(s));
@@ -234,7 +225,6 @@ describe('Krono API v2.3.0 — Contrato REST, Isolamento e Persistencia', () => 
     assert.ok(json.arquivoUrl.startsWith('https://engine.lat/krono-api/uploads/'));
     assert.ok(json.arquivoNome.endsWith('.pdf'));
 
-    // Verifica que o arquivo realmente e servido estaticamente
     const downloadResp = await fetch(`${baseUrl}/uploads/${json.arquivoNome}`);
     assert.equal(downloadResp.status, 200);
     const baixado = Buffer.from(await downloadResp.arrayBuffer());

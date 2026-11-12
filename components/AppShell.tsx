@@ -91,9 +91,7 @@ export function AppShell({
       setPerfil(p);
       setRecentes(pts.slice(0, 4));
       setCompactoInterno(prefs.modoCompacto);
-    } catch {
-      // Silencioso
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {

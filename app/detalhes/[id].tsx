@@ -92,7 +92,6 @@ export default function DetalhesScreen() {
           }
         }
       } catch {
-        // Silencioso
       } finally {
         if (ativo) setCarregando(false);
       }
@@ -158,9 +157,7 @@ export default function DetalhesScreen() {
     try {
       try {
         await excluirPontoApi(String(ponto.id), apiUrl);
-      } catch {
-        // Segue com remoção local
-      }
+      } catch {}
       await excluirPontoDoStorage(String(ponto.id));
       voltarParaHistorico();
     } catch {
@@ -184,9 +181,7 @@ export default function DetalhesScreen() {
           `Mapa: ${linkMapa}\n` +
           `Observação: ${ponto.observacao}`,
       });
-    } catch {
-      // Silencioso
-    }
+    } catch {}
   };
 
   return (

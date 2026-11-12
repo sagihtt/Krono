@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-
   <defs>
     <radialGradient id="obsidianGlow" cx="50%" cy="36%" r="70%">
       <stop offset="0%" stop-color="#1E222E" />
@@ -8,32 +7,18 @@
     </radialGradient>
   </defs>
   <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#obsidianGlow)" />
-
   <g transform="translate(512 512) scale(1.06) translate(-512 -512)">
-    <!-- Base subtle dial ring -->
     <circle cx="512" cy="516" r="266" fill="none" stroke="#252935" stroke-width="34" />
-
-    <!-- Top-right Emerald check-in arc -->
     <path d="M 550 253 A 266 266 0 0 1 772 460"
           fill="none" stroke="#00B95C" stroke-width="34" stroke-linecap="round" />
-
-    <!-- Bottom-right Electric Blue arc -->
     <path d="M 765 598 A 266 266 0 0 1 430 769"
           fill="none" stroke="#3186FF" stroke-width="34" stroke-linecap="round" />
-
-    <!-- Bottom-left Solar Amber arc -->
     <path d="M 314 694 A 266 266 0 0 1 259 434"
           fill="none" stroke="#FBBC04" stroke-width="34" stroke-linecap="round" />
-
-    <!-- Top-left Coral Red arc -->
     <path d="M 334 318 A 266 266 0 0 1 456 256"
           fill="none" stroke="#FC413D" stroke-width="34" stroke-linecap="round" />
-
-    <!-- 12-o'clock stopwatch crown index -->
     <line x1="512" y1="196" x2="512" y2="226"
           stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" />
-
-    <!-- Optically centered Geometric 'K' Monogram -->
     <line x1="414" y1="376" x2="414" y2="656"
           stroke="#FFFFFF" stroke-width="62" stroke-linecap="round" />
     <line x1="422" y1="524" x2="610" y2="376"
@@ -41,5 +26,4 @@
     <line x1="482" y1="478" x2="618" y2="656"
           stroke="#FFFFFF" stroke-width="58" stroke-linecap="round" />
   </g>
-
 </svg>

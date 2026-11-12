@@ -133,7 +133,6 @@ export default function HomeScreen() {
         await consultarStatusApi(urlAtiva);
         setApiOnline(true);
 
-        // Envia registros criados offline antes de atualizar a lista remota
         const pendentes = pontosLocais.filter(
           (item) => item.sincronizadoApi === false
         );
@@ -141,9 +140,7 @@ export default function HomeScreen() {
           for (const itemPendente of [...pendentes].reverse()) {
             try {
               await criarPontoApi(itemPendente, urlAtiva);
-            } catch {
-              // Mantem pendencia caso falhe pontualmente
-            }
+            } catch {}
           }
         }
 
@@ -199,9 +196,7 @@ export default function HomeScreen() {
               completo: regiao ? `${linha1} - ${regiao}` : linha1,
             };
           }
-        } catch {
-          // Segue para consulta Nominatim com timeout curto
-        }
+        } catch {}
       }
 
       const controller = new AbortController();
@@ -240,7 +235,6 @@ export default function HomeScreen() {
           };
         }
       } catch {
-        // Segue com endereco padrao da unidade
       } finally {
         clearTimeout(timer);
       }
@@ -302,7 +296,6 @@ export default function HomeScreen() {
     }
   }, [enderecoPrincipal, enderecoSecundario, resolverEnderecoAproximado]);
 
-  // Aquece silenciosamente a localizacao ao abrir caso a permissao ja esteja ativa
   useEffect(() => {
     Location.getForegroundPermissionsAsync()
       .then((perm) => {
@@ -359,7 +352,6 @@ export default function HomeScreen() {
         setLocalizacaoAtual(pos);
         ultimaLeituraGpsMsRef.current = Date.now();
 
-        // Atualiza o endereco reverso em segundo plano para nao segurar a marcacao
         resolverEnderecoAproximado(pos.coords.latitude, pos.coords.longitude)
           .then((end) => {
             setEnderecoPrincipal(end.linha1);
@@ -373,9 +365,7 @@ export default function HomeScreen() {
           endereco: enderecoCache,
         };
       }
-    } catch {
-      // Segue com coordenadas padrao sem bloquear
-    }
+    } catch {}
 
     return {
       latitude: localizacaoAtual?.coords.latitude ?? -15.7588,
@@ -430,9 +420,7 @@ export default function HomeScreen() {
           }
           return foto.uri;
         }
-      } catch {
-        // Sem webcam ativa ou emulador: segue sem travar o fluxo
-      }
+      } catch {}
     }
     return null;
   };
@@ -449,7 +437,6 @@ export default function HomeScreen() {
     setFeedbackRegistro(null);
 
     try {
-      // 1. Verificacao biometrica local (quando disponivel no dispositivo)
       if (Platform.OS !== 'web') {
         try {
           const [hasHardware, isEnrolled] = await Promise.all([
@@ -468,12 +455,9 @@ export default function HomeScreen() {
               return;
             }
           }
-        } catch {
-          // Segue em dispositivos sem sensor biometrico
-        }
+        } catch {}
       }
 
-      // 2. Localizacao em cache/rapida e foto otimizada em paralelo
       const [dadosGps, fotoCapturadaAgora] = await Promise.all([
         obterLocalizacaoRapidaNoClique(),
         fotoUri ? Promise.resolve(fotoUri) : tirarFotoComprovante(true),
@@ -500,7 +484,6 @@ export default function HomeScreen() {
         sincronizadoApi: false,
       };
 
-      // 3. Atualizacao imediata da tela (Optimistic UI)
       const listaOtimista = [registroOtimista, ...pontos];
       setPontos(listaOtimista);
       setCategoriaSelecionada(sugerirProximaCategoria(listaOtimista));
@@ -513,7 +496,6 @@ export default function HomeScreen() {
 
       await salvarPontosStorage(listaOtimista);
 
-      // 4. Sincronizacao em segundo plano com o servidor Express online
       (async () => {
         try {
           let uriFotoRemota = uriFinalFoto;
@@ -530,9 +512,7 @@ export default function HomeScreen() {
               if (up.arquivoUrl) {
                 uriFotoRemota = up.arquivoUrl;
               }
-            } catch {
-              // Mantem URI local caso o upload da imagem falhe
-            }
+            } catch {}
           }
 
           const criadoNaApi = await criarPontoApi(
@@ -574,9 +554,7 @@ export default function HomeScreen() {
         ...prefsAtuais,
         modoCompacto: valor,
       });
-    } catch {
-      // Silencioso
-    }
+    } catch {}
   }, []);
 
   const ultimoRegistroId = pontos[0]?.id ? String(pontos[0].id) : null;

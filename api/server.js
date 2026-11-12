@@ -106,7 +106,7 @@ function extrairPrimeiroArquivoMultipart(buffer, contentTypeHeader) {
       buffer[startPart] === 0x2d &&
       buffer[startPart + 1] === 0x2d
     ) {
-      break; // "--" final boundary
+      break;
     }
 
     const contentStart =
@@ -123,7 +123,6 @@ function extrairPrimeiroArquivoMultipart(buffer, contentTypeHeader) {
       const filenameMatch = /filename="([^"]*)"/i.exec(rawHeaders);
       if (filenameMatch && filenameMatch[1]) {
         const mimeMatch = /Content-Type:\s*([^\r\n;]+)/i.exec(rawHeaders);
-        // Strip trailing \r\n before next boundary
         let bodyEnd = nextBoundary;
         if (
           bodyEnd >= 2 &&
@@ -230,7 +229,6 @@ function createApp(options = {}) {
   const app = express();
   app.disable('x-powered-by');
 
-  // CORS completo com suporte ao header X-Krono-Client-Id
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -244,10 +242,8 @@ function createApp(options = {}) {
     next();
   });
 
-  // Arquivos enviados disponiveis em /uploads/*
   app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }));
 
-  // Rota /upload usa parser binario dedicado antes do express.json()
   app.post(
     '/upload',
     express.raw({ type: () => true, limit: '12mb' }),
@@ -289,7 +285,6 @@ function createApp(options = {}) {
 
   app.use(express.json({ limit: '5mb' }));
 
-  // Rota raiz da API (exibida ao acessar https://krono.engine.lat/api no navegador)
   app.get('/', (req, res) => {
     const base = obterPublicBaseUrl(req);
     res.status(200).json({
@@ -306,7 +301,6 @@ function createApp(options = {}) {
     });
   });
 
-  // Healthcheck de producao e Docker
   app.get('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
@@ -317,7 +311,6 @@ function createApp(options = {}) {
     });
   });
 
-  // Verificacao de conectividade utilizada pelo aplicativo (/clima)
   app.get('/clima', (req, res) => {
     res.status(200).json({
       cidade: 'Brasília - Sede Principal',
@@ -327,13 +320,11 @@ function createApp(options = {}) {
     });
   });
 
-  // 1. READ (GET /pontos)
   app.get('/pontos', (req, res) => {
     const colecao = obterColecaoCliente(req);
     res.status(200).json(colecao.pontos);
   });
 
-  // 2. READ por ID (GET /pontos/:id)
   app.get('/pontos/:id', (req, res) => {
     const colecao = obterColecaoCliente(req);
     const id = String(req.params.id);
@@ -346,7 +337,6 @@ function createApp(options = {}) {
     res.status(200).json(ponto);
   });
 
-  // 3. CREATE (POST /pontos)
   app.post('/pontos', (req, res) => {
     const colecao = obterColecaoCliente(req);
     const {
@@ -391,7 +381,6 @@ function createApp(options = {}) {
     res.status(201).json(novoPonto);
   });
 
-  // 4. UPDATE (PUT /pontos/:id)
   app.put('/pontos/:id', (req, res) => {
     const colecao = obterColecaoCliente(req);
     const id = String(req.params.id);
@@ -434,7 +423,6 @@ function createApp(options = {}) {
     res.status(200).json(ponto);
   });
 
-  // 5. DELETE (DELETE /pontos/:id)
   app.delete('/pontos/:id', (req, res) => {
     const colecao = obterColecaoCliente(req);
     const id = String(req.params.id);
@@ -449,7 +437,6 @@ function createApp(options = {}) {
     res.status(204).send();
   });
 
-  // Rotas /filmes mantidas com persistencia
   app.get('/filmes', (req, res) => {
     res.json(db.filmes.lista);
   });

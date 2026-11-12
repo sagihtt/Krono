@@ -237,9 +237,7 @@ export default function CadastroScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={[styles.container, isWide && styles.containerWide]}>
-            {/* Coluna 1: Resumo do Colaborador + Dados Pessoais */}
             <View style={[styles.column, isWide && styles.columnHalf]}>
-              {/* Card de Identificação */}
               <View style={styles.identityCard}>
                 <View style={styles.avatarLarge}>
                   <Text style={styles.avatarLargeText}>{iniciais}</Text>
@@ -259,7 +257,6 @@ export default function CadastroScreen() {
                 </View>
               </View>
 
-              {/* Card: Dados Pessoais */}
               <View style={styles.card}>
                 <DadosPessoais
                   nome={nome}
@@ -276,9 +273,7 @@ export default function CadastroScreen() {
               </View>
             </View>
 
-            {/* Coluna 2: Jornada, Credenciais e Ações */}
             <View style={[styles.column, isWide && styles.columnHalf]}>
-              {/* Card: Cargo e Jornada */}
               <View style={styles.card}>
                 <Text style={styles.sectionTitle}>Cargo e jornada</Text>
                 <FormInput
@@ -321,7 +316,6 @@ export default function CadastroScreen() {
                 </View>
               </View>
 
-              {/* Card: Credenciais e Confirmação */}
               <View style={styles.card}>
                 <DadosAcesso
                   senha={senha}
@@ -362,7 +356,6 @@ export default function CadastroScreen() {
                   <Text style={styles.statusFeedback}>{statusMensagem}</Text>
                 ) : null}
 
-                {/* Botões centralizados */}
                 <View style={styles.actionsStack}>
                   <TouchableOpacity
                     style={styles.primarySaveBtn}

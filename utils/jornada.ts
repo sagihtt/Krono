@@ -8,9 +8,6 @@ export const CATEGORIAS_JORNADA = [
   'Hora Extra',
 ] as const;
 
-/**
- * Sugere automaticamente o proximo tipo de marcacao com base no ultimo registro.
- */
 export function sugerirProximaCategoria(
   lista: Pick<PontoRegistro, 'categoria'>[]
 ): string {

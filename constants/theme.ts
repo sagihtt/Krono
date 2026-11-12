@@ -1,13 +1,3 @@
-/**
- * Design System inspirado diretamente em https://antigravity.google/
- * Paleta oficial extraída do site:
- * - Obsidian Ink (#121317)
- * - Pure Canvas (#FFFFFF) e Bento Surface (#F8F9FC)
- * - Translucent Pill Surface (rgba(183, 191, 217, 0.14) / #EEF1F8)
- * - Spectrum Accents: Electric Blue (#3186FF / #346BF1), Emerald (#00B95C),
- *   Coral Red (#FC413D), Solar Amber (#FBBC04 / #FFE432)
- */
-
 import { Platform } from 'react-native';
 
 export const AntigravityPalette = {
